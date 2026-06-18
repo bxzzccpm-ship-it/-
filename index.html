@@ -1,0 +1,1792 @@
+<!DOCTYPE html>
+<html lang="ar" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#062a6e">
+<title>Windows 10</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; user-select:none; -webkit-user-select:none; }
+  html, body { width:100%; height:100%; overflow:hidden; font-family:'Segoe UI',sans-serif; background:#000; }
+  html { height:100vh; height:100dvh; }
+  body {
+    height:100vh; height:100dvh;
+    padding: env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0);
+    position:fixed; inset:0;
+  }
+  /* Manual fullscreen trigger shown until the page is in true fullscreen */
+  #fsPrompt {
+    position:fixed; inset:0; z-index:10500; background:#062a6e;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px;
+    color:#fff; cursor:pointer;
+  }
+  #fsPrompt.hidden { display:none; }
+  #fsPrompt .fs-icon { font-size:42px; }
+  #fsPrompt .fs-text { font-size:15px; opacity:.85; }
+  #fsPrompt .fs-btn { padding:10px 26px; background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3); border-radius:4px; font-size:14px; }
+  /* Rotate-device hint, only relevant if orientation lock isn't supported */
+  #rotateHint {
+    position:fixed; inset:0; z-index:10400; background:rgba(6,42,110,.97);
+    display:none; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+    color:#fff; text-align:center; padding:20px;
+  }
+  #rotateHint.show { display:flex; }
+  #rotateHint .rh-icon { font-size:46px; animation:rotateHintSpin 1.6s ease-in-out infinite; }
+  @keyframes rotateHintSpin { 0%,100%{transform:rotate(0deg)} 50%{transform:rotate(90deg)} }
+  
+  /* ===== LOCKSCREEN ===== */
+  #lockscreen {
+    position:fixed; inset:0; z-index:9999;
+    background: linear-gradient(135deg, #0a2463 0%, #1e3a5f 40%, #3b6cb7 100%);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    cursor:pointer; transition:opacity .5s;
+  }
+  #lockscreen .lock-time { font-size:clamp(48px,15vw,90px); font-weight:200; color:#fff; letter-spacing:-2px; }
+  #lockscreen .lock-date { font-size:clamp(14px,4vw,20px); color:rgba(255,255,255,.8); margin-top:8px; }
+  #lockscreen .lock-hint { position:absolute; bottom:40px; color:rgba(255,255,255,.6); font-size:13px; animation:pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:.6} 50%{opacity:1} }
+  
+  /* ===== DESKTOP ===== */
+  #desktop {
+    position:fixed; inset:0;
+    background:
+      radial-gradient(ellipse 70% 50% at 80% 15%, rgba(120,200,255,.55) 0%, rgba(120,200,255,0) 60%),
+      radial-gradient(ellipse 60% 45% at 15% 85%, rgba(0,180,255,.35) 0%, rgba(0,180,255,0) 65%),
+      radial-gradient(ellipse 90% 70% at 50% 100%, rgba(10,40,110,.9) 0%, rgba(10,40,110,0) 70%),
+      linear-gradient(160deg, #051c4d 0%, #0d3e8f 45%, #1a7bc4 75%, #36b3df 100%);
+    background-color:#0d47a1;
+    overflow:hidden;
+  }
+  #desktop::before {
+    content:''; position:absolute; inset:0; pointer-events:none;
+    background:
+      linear-gradient(115deg, transparent 35%, rgba(255,255,255,.07) 45%, rgba(255,255,255,.12) 50%, rgba(255,255,255,.07) 55%, transparent 65%);
+  }
+  
+  /* Desktop icons */
+  .desktop-icon {
+    position:absolute; display:flex; flex-direction:column; align-items:center;
+    width:80px; padding:8px 4px; border-radius:4px; cursor:pointer;
+    gap:6px;
+  }
+  .desktop-icon:hover { background:rgba(255,255,255,.15); }
+  .desktop-icon:active { background:rgba(255,255,255,.25); }
+  .desktop-icon .icon-img { font-size:36px; }
+  .desktop-icon .icon-img svg { width:40px; height:40px; display:block; filter:drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
+  .desktop-icon .icon-label { font-size:11px; color:#fff; text-align:center; text-shadow:0 1px 3px rgba(0,0,0,.8); word-break:break-word; line-height:1.3; }
+
+  /* Right-click context menu */
+  #contextMenu {
+    position:fixed; z-index:8000; background:#fff; border:1px solid #ccc;
+    border-radius:4px; box-shadow:0 4px 20px rgba(0,0,0,.3); min-width:180px;
+    display:none; overflow:hidden;
+  }
+  .ctx-item { padding:8px 16px; font-size:13px; cursor:pointer; color:#222; }
+  .ctx-item:hover { background:#e5f0ff; }
+  .ctx-sep { height:1px; background:#e0e0e0; margin:4px 0; }
+
+  /* ===== TASKBAR ===== */
+  #taskbar {
+    position:fixed; bottom:0; left:0; right:0; height:48px;
+    background:rgba(30,30,30,.95); backdrop-filter:blur(20px);
+    display:flex; align-items:center; z-index:7000;
+    border-top:1px solid rgba(255,255,255,.08);
+  }
+  #startBtn {
+    width:48px; height:48px; display:flex; align-items:center; justify-content:center;
+    cursor:pointer; transition:background .15s; flex-shrink:0;
+  }
+  #startBtn:hover { background:rgba(255,255,255,.1); }
+  #startBtn:active { background:rgba(255,255,255,.2); }
+  #startBtn svg { width:20px; height:20px; }
+  
+  #searchBar {
+    height:32px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.08);
+    border-radius:2px; display:flex; align-items:center; padding:0 10px; gap:8px;
+    margin-left:4px; width:min(280px,45vw); cursor:text;
+  }
+  #searchBar:hover { background:rgba(255,255,255,.18); }
+  #searchBar span { color:rgba(255,255,255,.6); font-size:13px; }
+  #searchBar .search-icon { color:rgba(255,255,255,.5); font-size:14px; }
+
+  #taskbarApps { display:flex; align-items:center; flex:1; padding:0 4px; overflow:hidden; }
+  .tb-app {
+    height:40px; min-width:44px; max-width:160px; display:flex; align-items:center;
+    padding:0 10px; gap:6px; cursor:pointer; border-radius:2px;
+    position:relative; color:#fff; font-size:12px; transition:background .15s;
+    white-space:nowrap; overflow:hidden;
+  }
+  .tb-app:hover { background:rgba(255,255,255,.1); }
+  .tb-app.active { background:rgba(255,255,255,.15); }
+  .tb-app.active::after {
+    content:''; position:absolute; bottom:0; left:50%; transform:translateX(-50%);
+    width:24px; height:2px; background:#0078d7; border-radius:2px 2px 0 0;
+  }
+  .tb-app .tb-icon { font-size:18px; }
+  .tb-app .tb-icon svg { width:18px; height:18px; display:block; }
+
+  #taskbarRight {
+    display:flex; align-items:center; padding:0 8px; gap:4px;
+    color:rgba(255,255,255,.9); font-size:12px;
+  }
+  .tb-sys-icon { width:32px; height:32px; display:flex; align-items:center; justify-content:center; cursor:pointer; border-radius:2px; }
+  .tb-sys-icon:hover { background:rgba(255,255,255,.1); }
+  #clock { display:flex; flex-direction:column; align-items:center; padding:4px 8px; cursor:pointer; min-width:60px; }
+  #clock:hover { background:rgba(255,255,255,.1); border-radius:2px; }
+  #clockTime { font-size:12px; }
+  #clockDate { font-size:11px; color:rgba(255,255,255,.7); }
+
+  /* ===== START MENU ===== */
+  #startMenu {
+    position:fixed; bottom:48px; left:0; width:min(500px,100vw);
+    height:min(600px,80vh); background:#1f1f1f; z-index:7500;
+    display:none; flex-direction:column; box-shadow:4px -4px 20px rgba(0,0,0,.5);
+    border-radius:0 4px 0 0;
+  }
+  #startMenu.open { display:flex; }
+  
+  .sm-top { display:flex; align-items:center; padding:16px; gap:12px; }
+  .sm-user-avatar {
+    width:40px; height:40px; border-radius:50%; background:linear-gradient(135deg,#0078d7,#00b4ff);
+    display:flex; align-items:center; justify-content:center; font-size:18px; color:#fff;
+  }
+  .sm-username { color:#fff; font-size:14px; font-weight:500; }
+  
+  .sm-search {
+    margin:0 16px; height:36px; background:rgba(255,255,255,.08);
+    border:1px solid rgba(255,255,255,.15); border-radius:2px;
+    display:flex; align-items:center; padding:0 10px; gap:8px;
+  }
+  .sm-search input {
+    background:none; border:none; outline:none; color:#fff; font-size:13px; flex:1;
+    font-family:inherit;
+  }
+  .sm-search input::placeholder { color:rgba(255,255,255,.4); }
+
+  .sm-tiles { display:flex; flex-wrap:wrap; gap:4px; padding:12px 16px; flex:1; overflow-y:auto; align-content:flex-start; }
+  .tile {
+    width:calc(25% - 3px); aspect-ratio:1; border-radius:2px; display:flex;
+    flex-direction:column; align-items:center; justify-content:center;
+    cursor:pointer; gap:4px; transition:opacity .15s; position:relative; overflow:hidden;
+  }
+  .tile:hover { opacity:.85; }
+  .tile:active { opacity:.7; }
+  .tile .tile-icon { font-size:28px; }
+  .tile .tile-icon svg { width:30px; height:30px; display:block; }
+  .tile .tile-label { font-size:10px; color:#fff; text-align:center; font-weight:500; }
+
+  .sm-bottom { display:flex; padding:8px 16px 16px; gap:8px; border-top:1px solid rgba(255,255,255,.08); }
+  .sm-bottom-btn {
+    flex:1; height:36px; display:flex; align-items:center; justify-content:center;
+    gap:8px; background:rgba(255,255,255,.06); border-radius:2px; cursor:pointer;
+    color:rgba(255,255,255,.8); font-size:12px;
+  }
+  .sm-bottom-btn:hover { background:rgba(255,255,255,.12); }
+
+  /* ===== WINDOWS ===== */
+  .window {
+    position:fixed; background:#fff; border-radius:4px 4px 0 0;
+    box-shadow:0 8px 40px rgba(0,0,0,.4); display:flex; flex-direction:column;
+    overflow:hidden; min-width:300px; min-height:200px;
+    transition:box-shadow .15s;
+  }
+  .window.focused { box-shadow:0 12px 50px rgba(0,0,0,.6); z-index:6000 !important; }
+  
+  .win-titlebar {
+    height:30px; display:flex; align-items:center; background:#f3f3f3;
+    border-bottom:1px solid #e0e0e0; cursor:move; flex-shrink:0;
+  }
+  .win-titlebar .win-icon { width:30px; text-align:center; font-size:14px; display:flex; align-items:center; justify-content:center; }
+  .win-titlebar .win-icon svg { width:16px; height:16px; }
+  .win-titlebar .win-title { flex:1; font-size:12px; color:#333; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  .win-controls { display:flex; }
+  .win-btn {
+    width:46px; height:30px; display:flex; align-items:center; justify-content:center;
+    font-size:12px; cursor:pointer; color:#333; transition:background .1s;
+  }
+  .win-btn:hover { background:rgba(0,0,0,.08); }
+  .win-btn.close:hover { background:#e81123; color:#fff; }
+  .win-btn.maximize:hover { background:rgba(0,0,0,.08); }
+  
+  .win-content { flex:1; overflow:auto; background:#fff; position:relative; }
+
+  /* ===== RESIZE HANDLES ===== */
+  .resize-handle {
+    position:absolute; z-index:10;
+  }
+  .resize-n  { top:0;    left:4px;  right:4px;  height:4px; cursor:n-resize; }
+  .resize-s  { bottom:0; left:4px;  right:4px;  height:4px; cursor:s-resize; }
+  .resize-w  { left:0;   top:4px;   bottom:4px; width:4px;  cursor:w-resize; }
+  .resize-e  { right:0;  top:4px;   bottom:4px; width:4px;  cursor:e-resize; }
+  .resize-nw { top:0;    left:0;    width:8px;  height:8px; cursor:nw-resize; }
+  .resize-ne { top:0;    right:0;   width:8px;  height:8px; cursor:ne-resize; }
+  .resize-sw { bottom:0; left:0;    width:8px;  height:8px; cursor:sw-resize; }
+  .resize-se { bottom:0; right:0;   width:8px;  height:8px; cursor:se-resize; }
+
+  /* ===== APP CONTENTS ===== */
+  /* File Explorer */
+  .explorer { display:flex; flex-direction:column; height:100%; }
+  .explorer-toolbar {
+    display:flex; align-items:center; background:#f3f3f3; padding:4px 8px; gap:6px;
+    border-bottom:1px solid #e0e0e0; flex-wrap:wrap;
+  }
+  .exp-btn {
+    padding:4px 10px; border:1px solid #ccc; background:#fff; border-radius:2px;
+    font-size:12px; cursor:pointer; font-family:inherit;
+  }
+  .exp-btn:hover { background:#e5f0ff; border-color:#0078d7; }
+  .exp-addr { flex:1; min-width:100px; height:26px; border:1px solid #ccc; padding:0 8px; font-size:12px; border-radius:2px; background:#fff; font-family:inherit; }
+  .explorer-body { display:flex; flex:1; overflow:hidden; }
+  .explorer-sidebar {
+    width:140px; border-right:1px solid #e0e0e0; overflow-y:auto; background:#fafafa;
+    padding:8px 0;
+  }
+  .sidebar-item {
+    display:flex; align-items:center; gap:8px; padding:5px 12px; cursor:pointer;
+    font-size:12px; color:#333;
+  }
+  .sidebar-item:hover { background:#e5f0ff; }
+  .sidebar-item.active { background:#cce4ff; }
+  .explorer-files { flex:1; overflow-y:auto; padding:8px; display:flex; flex-wrap:wrap; gap:8px; align-content:flex-start; }
+  .file-item {
+    width:80px; display:flex; flex-direction:column; align-items:center; gap:4px;
+    padding:8px 4px; cursor:pointer; border-radius:2px;
+  }
+  .file-item:hover { background:#e5f0ff; }
+  .file-item.selected { background:#cce4ff; }
+  .file-item .fi-icon { font-size:32px; }
+  .file-item .fi-name { font-size:11px; color:#333; text-align:center; word-break:break-all; line-height:1.3; }
+  
+  /* Notepad */
+  .notepad { display:flex; flex-direction:column; height:100%; }
+  .np-menu { display:flex; background:#f3f3f3; border-bottom:1px solid #e0e0e0; }
+  .np-menu-item { padding:4px 10px; font-size:12px; cursor:pointer; color:#333; }
+  .np-menu-item:hover { background:#e5f0ff; }
+  .np-textarea { flex:1; border:none; outline:none; padding:8px; font-size:13px; font-family:'Courier New',monospace; resize:none; color:#222; }
+  
+  /* Calculator */
+  .calc { display:flex; flex-direction:column; background:#1e1e1e; height:100%; }
+  .calc-display { padding:12px 16px; text-align:right; }
+  .calc-expr { font-size:14px; color:rgba(255,255,255,.5); min-height:20px; }
+  .calc-result { font-size:36px; color:#fff; font-weight:200; word-break:break-all; }
+  .calc-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:2px; padding:0 2px 2px; flex:1; }
+  .calc-btn {
+    background:#2d2d2d; border:none; color:#fff; font-size:16px; cursor:pointer;
+    padding:0; min-height:44px; border-radius:2px; font-family:inherit; transition:background .1s;
+  }
+  .calc-btn:hover { background:#3a3a3a; }
+  .calc-btn:active { background:#454545; }
+  .calc-btn.op { background:#333; color:#00b4ff; }
+  .calc-btn.eq { background:#0078d7; }
+  .calc-btn.eq:hover { background:#006cc1; }
+  .calc-btn.span2 { grid-column:span 2; }
+  .calc-btn.clr { color:#ff6b6b; }
+  
+  /* Settings */
+  .settings { display:flex; height:100%; }
+  .settings-sidebar { width:220px; background:#f3f3f3; border-right:1px solid #e0e0e0; overflow-y:auto; }
+  .settings-sidebar-header { padding:16px; font-size:16px; font-weight:600; color:#333; }
+  .settings-item { display:flex; align-items:center; gap:12px; padding:10px 16px; cursor:pointer; font-size:13px; color:#333; }
+  .settings-item:hover { background:#e0e0e0; }
+  .settings-item.active { background:#cce4ff; color:#0078d7; }
+  .settings-content { flex:1; overflow-y:auto; padding:20px; }
+  .settings-content h2 { font-size:20px; color:#333; margin-bottom:16px; font-weight:400; }
+  .settings-section { margin-bottom:20px; }
+  .settings-section h3 { font-size:14px; color:#555; margin-bottom:10px; border-bottom:1px solid #e0e0e0; padding-bottom:6px; }
+  .setting-row { display:flex; align-items:center; justify-content:space-between; padding:8px 0; }
+  .setting-row label { font-size:13px; color:#333; }
+  .toggle { width:44px; height:22px; background:#ccc; border-radius:11px; cursor:pointer; position:relative; transition:background .2s; }
+  .toggle.on { background:#0078d7; }
+  .toggle::after { content:''; position:absolute; top:2px; left:2px; width:18px; height:18px; background:#fff; border-radius:50%; transition:left .2s; }
+  .toggle.on::after { left:24px; }
+  .setting-select { padding:4px 8px; border:1px solid #ccc; border-radius:2px; font-size:13px; font-family:inherit; }
+
+  /* Task Manager */
+  .taskman { display:flex; flex-direction:column; height:100%; }
+  .taskman-tabs { display:flex; background:#f3f3f3; border-bottom:1px solid #e0e0e0; }
+  .tm-tab { padding:8px 16px; font-size:12px; cursor:pointer; color:#333; border-bottom:2px solid transparent; }
+  .tm-tab.active { border-bottom-color:#0078d7; color:#0078d7; }
+  .taskman-body { flex:1; overflow:auto; }
+  .tm-table { width:100%; border-collapse:collapse; font-size:12px; }
+  .tm-table th { background:#f3f3f3; padding:8px 12px; text-align:left; border-bottom:2px solid #e0e0e0; font-weight:600; color:#555; position:sticky; top:0; }
+  .tm-table td { padding:6px 12px; border-bottom:1px solid #f0f0f0; color:#333; }
+  .tm-table tr:hover td { background:#f5f5f5; }
+  .usage-bar { height:10px; border-radius:2px; background:#e0e0e0; overflow:hidden; min-width:60px; }
+  .usage-fill { height:100%; border-radius:2px; transition:width 1s; }
+
+  /* Paint */
+  .paint-app { display:flex; flex-direction:column; height:100%; background:#f0f0f0; }
+  .paint-toolbar { display:flex; align-items:center; gap:8px; padding:6px 10px; background:#f3f3f3; border-bottom:1px solid #e0e0e0; flex-wrap:wrap; }
+  .paint-tool { width:32px; height:32px; display:flex; align-items:center; justify-content:center; border:1px solid transparent; border-radius:2px; cursor:pointer; font-size:16px; }
+  .paint-tool:hover, .paint-tool.active { border-color:#0078d7; background:#e5f0ff; }
+  .paint-colors { display:flex; gap:3px; align-items:center; }
+  .paint-color { width:18px; height:18px; border-radius:2px; cursor:pointer; border:2px solid transparent; }
+  .paint-color:hover { border-color:#666; }
+  .paint-color.selected { border-color:#0078d7; }
+  .paint-size { display:flex; align-items:center; gap:6px; font-size:12px; }
+  .paint-size input { width:60px; }
+  .paint-canvas-wrap { flex:1; overflow:auto; display:flex; align-items:flex-start; justify-content:flex-start; padding:10px; }
+  .paint-canvas { background:#fff; cursor:crosshair; display:block; box-shadow:0 2px 8px rgba(0,0,0,.2); }
+
+  /* Media Player */
+  .mediaplayer { display:flex; flex-direction:column; height:100%; background:#1a1a2e; color:#fff; }
+  .mp-display { flex:1; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:16px; }
+  .mp-cover { width:100px; height:100px; border-radius:50%; background:linear-gradient(135deg,#0078d7,#00b4ff); display:flex; align-items:center; justify-content:center; font-size:40px; box-shadow:0 0 30px rgba(0,120,215,.4); }
+  .mp-cover.playing { animation:spin 3s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .mp-title { font-size:16px; font-weight:500; }
+  .mp-artist { font-size:13px; color:rgba(255,255,255,.6); }
+  .mp-progress { padding:0 20px; }
+  .mp-bar { height:4px; background:rgba(255,255,255,.2); border-radius:2px; overflow:hidden; cursor:pointer; }
+  .mp-fill { height:100%; background:#0078d7; border-radius:2px; width:0%; transition:width .5s linear; }
+  .mp-time { display:flex; justify-content:space-between; font-size:11px; color:rgba(255,255,255,.5); margin-top:4px; }
+  .mp-controls { display:flex; align-items:center; justify-content:center; gap:20px; padding:16px; }
+  .mp-btn { font-size:20px; cursor:pointer; opacity:.8; transition:opacity .15s; }
+  .mp-btn:hover { opacity:1; }
+  .mp-btn.play { font-size:32px; opacity:1; }
+
+  /* Browser */
+  .browser { display:flex; flex-direction:column; height:100%; }
+  .browser-bar { display:flex; align-items:center; gap:6px; padding:6px 8px; background:#f3f3f3; border-bottom:1px solid #e0e0e0; }
+  .browser-nav { display:flex; gap:2px; }
+  .brow-btn { width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:50%; cursor:pointer; font-size:14px; color:#555; }
+  .brow-btn:hover { background:#e0e0e0; }
+  .browser-addr { flex:1; height:28px; border:1px solid #ccc; border-radius:14px; padding:0 12px; font-size:12px; font-family:inherit; background:#fff; }
+  .browser-content { flex:1; background:#fff; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:16px; color:#333; }
+  .browser-content.home { background:#f3f3f3; }
+  .bing-logo { font-size:48px; font-weight:300; color:#0078d7; }
+  .bing-search { display:flex; gap:0; width:min(400px,90%); }
+  .bing-input { flex:1; height:36px; border:1px solid #ccc; border-radius:18px 0 0 18px; padding:0 16px; font-size:14px; font-family:inherit; outline:none; }
+  .bing-input:focus { border-color:#0078d7; }
+  .bing-go { height:36px; width:44px; background:#0078d7; border:none; border-radius:0 18px 18px 0; color:#fff; font-size:16px; cursor:pointer; }
+  .bing-go:hover { background:#006cc1; }
+
+  /* Notifications */
+  #notifArea {
+    position:fixed; bottom:58px; right:0; width:min(360px,100vw);
+    background:rgba(30,30,30,.97); border-left:1px solid rgba(255,255,255,.1);
+    z-index:7200; display:none; flex-direction:column; max-height:80vh; overflow-y:auto;
+  }
+  #notifArea.open { display:flex; }
+  .notif-header { padding:16px; font-size:14px; color:#fff; font-weight:600; border-bottom:1px solid rgba(255,255,255,.1); display:flex; justify-content:space-between; }
+  .notif-clear { font-size:12px; color:#0078d7; cursor:pointer; font-weight:400; }
+  .notif-item { padding:12px 16px; border-bottom:1px solid rgba(255,255,255,.06); }
+  .notif-item-title { font-size:13px; color:#fff; font-weight:500; }
+  .notif-item-body { font-size:12px; color:rgba(255,255,255,.6); margin-top:3px; }
+  .notif-item-time { font-size:11px; color:rgba(255,255,255,.4); margin-top:4px; }
+  .notif-toggles { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:12px; }
+  .notif-toggle-btn { background:rgba(255,255,255,.08); border-radius:4px; padding:10px; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; }
+  .notif-toggle-btn.on { background:rgba(0,120,215,.3); }
+  .notif-toggle-btn .ntb-icon { font-size:18px; color:#fff; }
+  .notif-toggle-btn .ntb-label { font-size:10px; color:rgba(255,255,255,.7); }
+
+  /* Toast notification */
+  #toastArea { position:fixed; top:16px; right:16px; z-index:9000; display:flex; flex-direction:column; gap:8px; }
+  .toast {
+    background:#1f1f1f; color:#fff; border-radius:4px; padding:12px 16px;
+    box-shadow:0 4px 20px rgba(0,0,0,.5); max-width:300px;
+    border-left:3px solid #0078d7; animation:slideIn .3s ease;
+    font-size:13px;
+  }
+  .toast-title { font-weight:600; margin-bottom:3px; }
+  .toast-body { color:rgba(255,255,255,.7); }
+  @keyframes slideIn { from{transform:translateX(320px);opacity:0} to{transform:translateX(0);opacity:1} }
+
+  /* Boot screen */
+  #bootScreen {
+    position:fixed; inset:0; background:#0a2463; z-index:10000;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:24px;
+  }
+  .windows-logo { font-size:60px; color:#fff; animation:wlogoIn .8s ease; }
+  @keyframes wlogoIn { from{opacity:0;transform:scale(.5)} to{opacity:1;transform:scale(1)} }
+  .boot-spinner { width:40px; height:40px; border:3px solid rgba(255,255,255,.2); border-top-color:#fff; border-radius:50%; animation:spin .8s linear infinite; }
+  .boot-text { color:rgba(255,255,255,.6); font-size:14px; }
+
+  /* Touch controls */
+  #touchControls {
+    position:fixed; bottom:58px; left:0; right:0; height:50px; z-index:6500;
+    display:flex; align-items:center; justify-content:center; gap:12px;
+    background:rgba(0,0,0,.6); backdrop-filter:blur(10px);
+    border-top:1px solid rgba(255,255,255,.1);
+  }
+  .touch-btn {
+    height:38px; padding:0 16px; background:rgba(255,255,255,.1);
+    border-radius:4px; color:#fff; font-size:13px; cursor:pointer;
+    display:flex; align-items:center; gap:6px; border:1px solid rgba(255,255,255,.15);
+    white-space:nowrap;
+  }
+  .touch-btn:active { background:rgba(255,255,255,.25); }
+  #mousePointer {
+    position:fixed; width:20px; height:20px; z-index:9500; pointer-events:none;
+    transform:translate(-2px,-2px); display:none;
+  }
+  #mousePointer svg { width:100%; height:100%; filter:drop-shadow(1px 1px 2px rgba(0,0,0,.5)); }
+  /* Full-screen relative trackpad: covers the whole desktop so the cursor can be
+     driven from anywhere on screen instead of a small fixed corner pad */
+  #trackpadLayer {
+    position:fixed; inset:0; bottom:108px; z-index:9400; display:none;
+    touch-action:none; background:rgba(0,0,0,0);
+  }
+  #trackpadLayer.active { display:block; }
+  #trackpadBadge {
+    position:fixed; bottom:114px; left:50%; transform:translateX(-50%);
+    background:rgba(0,0,0,.55); color:#fff; font-size:11px; padding:5px 12px;
+    border-radius:12px; z-index:6450; display:none; pointer-events:none; white-space:nowrap;
+  }
+  #trackpadLayer.active ~ #trackpadBadge,
+  #trackpadBadge.show { display:block; }
+  
+  .win-maximized { border-radius:0 !important; top:0 !important; left:0 !important; width:100% !important; height:calc(100% - 48px) !important; }
+
+  /* Virtual keyboard hint */
+  #vkb {
+    position:fixed; bottom:168px; left:50%; transform:translateX(-50%);
+    background:rgba(30,30,30,.95); border:1px solid rgba(255,255,255,.2); border-radius:8px;
+    padding:8px; z-index:9100; display:none; width:min(500px,95vw);
+  }
+  .vkb-row { display:flex; gap:4px; justify-content:center; margin-bottom:4px; }
+  .vk { 
+    min-width:30px; height:36px; background:rgba(255,255,255,.15); border-radius:4px;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    color:#fff; font-size:13px; padding:0 6px; border:1px solid rgba(255,255,255,.1);
+  }
+  .vk:active { background:rgba(255,255,255,.35); }
+  .vk.wide { min-width:60px; }
+  .vk.wider { min-width:80px; }
+  .vk.space { min-width:160px; }
+
+  /* ===== LANDSCAPE TUNING ===== */
+  @media (orientation:landscape) {
+    #touchControls { height:42px; gap:8px; bottom:48px; }
+    .touch-btn { height:32px; padding:0 12px; font-size:12px; }
+    #vkb { bottom:96px; padding:6px; width:min(460px,70vw); }
+    .vk { height:30px; min-width:26px; font-size:12px; }
+    #trackpadLayer { bottom:90px; }
+    #trackpadBadge { bottom:96px; }
+  }
+  @media (orientation:portrait) {
+    #touchControls { bottom:0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Custom flat-style app icon sprite (original artwork, no external assets needed) -->
+<svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+<defs>
+<symbol id="ic-folder" viewBox="0 0 48 48"><path d="M4 12c0-2.2 1.8-4 4-4h10l4 4h18c2.2 0 4 1.8 4 4v20c0 2.2-1.8 4-4 4H8c-2.2 0-4-1.8-4-4z" fill="#FFC542"/><path d="M4 16h40v20c0 2.2-1.8 4-4 4H8c-2.2 0-4-1.8-4-4z" fill="#FFB300"/></symbol>
+<symbol id="ic-edge" viewBox="0 0 48 48"><circle cx="24" cy="24" r="21" fill="#0FA0E0"/><path d="M24 6c-9 0-16.2 6.5-17.7 15 2-4.5 7.4-7.8 13.2-7.8 7.2 0 12 4.6 12 11 0 4-2.6 6.4-6 6.4-3 0-5-1.8-5-4.4 0-1.6 1-2.8 1-2.8s-3.6.2-3.6 4c0 4 3.8 7 9 7 6.6 0 11.6-4.8 11.6-12C38 13.4 31.8 6 24 6z" fill="#fff"/><path d="M8 28c1.6 7 8.6 12.4 17 12.4 4 0 7.6-1.2 10.4-3.2-3 1-6.6.6-9.4-1.4-1.6-1.2-2.6-2.8-3-4.4-1.6 1-3.6 1.6-5.6 1.6-5.4 0-9-3-9.4-4.6z" fill="#1B85C8"/></symbol>
+<symbol id="ic-notepad" viewBox="0 0 48 48"><rect x="9" y="4" width="30" height="40" rx="2" fill="#fff" stroke="#cfd3d8" stroke-width="1"/><rect x="9" y="4" width="30" height="9" fill="#5B9BD5"/><rect x="14" y="19" width="20" height="2.4" fill="#d7dbe0"/><rect x="14" y="25" width="20" height="2.4" fill="#d7dbe0"/><rect x="14" y="31" width="14" height="2.4" fill="#d7dbe0"/><path d="M30 28l8-8 3 3-8 8-4 1z" fill="#FFC542"/></symbol>
+<symbol id="ic-settings" viewBox="0 0 48 48"><circle cx="24" cy="24" r="7.5" fill="#9aa0a6"/><path d="M24 4l3 5.6 6-2 1.4 6.2 6.2 1.4-2 6L44 24l-5.4 3.8 2 6-6.2 1.4-1.4 6.2-6-2L24 44l-3-5.6-6 2-1.4-6.2-6.2-1.4 2-6L4 24l5.4-3.8-2-6 6.2-1.4L14.6 6.6l6 2z" fill="none" stroke="#7d8389" stroke-width="3.2"/></symbol>
+<symbol id="ic-paint" viewBox="0 0 48 48"><path d="M24 6C13 6 5 14.5 5 24.5 5 33 11.4 40 20 41.6c1.8.3 2.6-1 2.2-2.4-.4-1.4-.8-2.4.4-3.4 1.2-1 3-.6 4.8-.6 8 0 15.6-5.6 15.6-14.8C43 13 35 6 24 6z" fill="#F4F4F4" stroke="#d6d6d6" stroke-width="1"/><circle cx="15" cy="22" r="3.4" fill="#E53935"/><circle cx="22" cy="15" r="3.4" fill="#43A047"/><circle cx="31" cy="16" r="3.4" fill="#FB8C00"/><circle cx="36" cy="24" r="3.4" fill="#1E88E5"/></symbol>
+<symbol id="ic-calc" viewBox="0 0 48 48"><rect x="10" y="4" width="28" height="40" rx="3" fill="#2D2D2D"/><rect x="14" y="9" width="20" height="9" rx="1" fill="#9be3ff"/><g fill="#bdbdbd"><circle cx="17" cy="24" r="2.6"/><circle cx="24" cy="24" r="2.6"/><circle cx="31" cy="24" r="2.6"/><circle cx="17" cy="31" r="2.6"/><circle cx="24" cy="31" r="2.6"/><circle cx="31" cy="31" r="2.6"/><circle cx="17" cy="38" r="2.6"/><circle cx="24" cy="38" r="2.6"/></g><circle cx="31" cy="38" r="2.6" fill="#0078D7"/></symbol>
+<symbol id="ic-media" viewBox="0 0 48 48"><circle cx="24" cy="24" r="20" fill="#7C3FBF"/><circle cx="24" cy="24" r="7.5" fill="#1a1a2e"/><circle cx="24" cy="24" r="2.4" fill="#bbb"/><path d="M24 4a20 20 0 0 1 17.3 10L24 24z" fill="#A569E0"/></symbol>
+<symbol id="ic-taskman" viewBox="0 0 48 48"><rect x="5" y="5" width="38" height="38" rx="3" fill="#1B1B1B"/><rect x="11" y="28" width="5" height="10" fill="#3BD46B"/><rect x="19" y="20" width="5" height="18" fill="#0FA0E0"/><rect x="27" y="14" width="5" height="24" fill="#FFC542"/><rect x="35" y="24" width="5" height="14" fill="#E5534B"/></symbol>
+<symbol id="ic-store" viewBox="0 0 48 48"><path d="M8 14h32l-2 26a3 3 0 0 1-3 2.6H13a3 3 0 0 1-3-2.6z" fill="#E81224"/><path d="M16 14a8 8 0 0 1 16 0" fill="none" stroke="#fff" stroke-width="3"/></symbol>
+<symbol id="ic-word" viewBox="0 0 48 48"><rect x="6" y="4" width="30" height="40" rx="2" fill="#fff"/><rect x="22" y="14" width="20" height="20" fill="#2B7CD3"/><text x="32" y="29" font-size="13" fill="#fff" font-family="Arial" text-anchor="middle" font-weight="bold">W</text></symbol>
+<symbol id="ic-excel" viewBox="0 0 48 48"><rect x="6" y="4" width="30" height="40" rx="2" fill="#fff"/><rect x="22" y="14" width="20" height="20" fill="#1D6F42"/><text x="32" y="29" font-size="13" fill="#fff" font-family="Arial" text-anchor="middle" font-weight="bold">X</text></symbol>
+<symbol id="ic-ppt" viewBox="0 0 48 48"><rect x="6" y="4" width="30" height="40" rx="2" fill="#fff"/><rect x="22" y="14" width="20" height="20" fill="#CA5010"/><text x="32" y="29" font-size="13" fill="#fff" font-family="Arial" text-anchor="middle" font-weight="bold">P</text></symbol>
+</defs>
+</svg>
+
+<!-- Fullscreen prompt: real Android/Chrome status bar can only be hidden after a user
+     gesture triggers the Fullscreen API, so we ask for one tap up front -->
+<div id="fsPrompt" onclick="enterImmersive()">
+  <div class="fs-icon">⛶</div>
+  <div class="fs-text">اضغط لتشغيل وضع ملء الشاشة الكامل</div>
+  <div class="fs-btn">ملء الشاشة</div>
+</div>
+
+<!-- Shown only if the browser refuses to lock landscape (e.g. iOS Safari) -->
+<div id="rotateHint">
+  <div class="rh-icon">📱</div>
+  <div style="font-size:15px">رجاءً دوّر جهازك إلى الوضع العرضي (Landscape)</div>
+  <div style="font-size:12px;opacity:.7">هذا المتصفح لا يسمح بقفل الاتجاه تلقائياً، دوّر الجهاز يدوياً</div>
+</div>
+
+<!-- Boot Screen -->
+<div id="bootScreen">
+  <div class="windows-logo">⊞</div>
+  <div class="boot-spinner"></div>
+  <div class="boot-text">جاري التشغيل...</div>
+</div>
+
+<!-- Lock Screen -->
+<div id="lockscreen">
+  <div class="lock-time" id="lockTime">--:--</div>
+  <div class="lock-date" id="lockDate">--</div>
+  <div class="lock-hint">اضغط للإلغاء القفل</div>
+</div>
+
+<!-- Desktop -->
+<div id="desktop">
+  <!-- Desktop Icons -->
+  <div class="desktop-icon" style="top:20px;left:20px" onclick="openApp('explorer')" oncontextmenu="showCtx(event,'folder')">
+    <div class="icon-img"><svg><use href="#ic-folder"/></svg></div>
+    <div class="icon-label">هذا الكمبيوتر</div>
+  </div>
+  <div class="desktop-icon" style="top:120px;left:20px" onclick="openApp('browser')" oncontextmenu="showCtx(event,'file')">
+    <div class="icon-img"><svg><use href="#ic-edge"/></svg></div>
+    <div class="icon-label">Microsoft Edge</div>
+  </div>
+  <div class="desktop-icon" style="top:220px;left:20px" onclick="openApp('notepad')" oncontextmenu="showCtx(event,'file')">
+    <div class="icon-img"><svg><use href="#ic-notepad"/></svg></div>
+    <div class="icon-label">المفكرة</div>
+  </div>
+  <div class="desktop-icon" style="top:320px;left:20px" onclick="openApp('settings')" oncontextmenu="showCtx(event,'settings')">
+    <div class="icon-img"><svg><use href="#ic-settings"/></svg></div>
+    <div class="icon-label">الإعدادات</div>
+  </div>
+  <div class="desktop-icon" style="top:20px;left:110px" onclick="openApp('paint')" oncontextmenu="showCtx(event,'file')">
+    <div class="icon-img"><svg><use href="#ic-paint"/></svg></div>
+    <div class="icon-label">الرسام</div>
+  </div>
+  <div class="desktop-icon" style="top:120px;left:110px" onclick="openApp('calc')" oncontextmenu="showCtx(event,'file')">
+    <div class="icon-img"><svg><use href="#ic-calc"/></svg></div>
+    <div class="icon-label">الآلة الحاسبة</div>
+  </div>
+  <div class="desktop-icon" style="top:220px;left:110px" onclick="openApp('media')" oncontextmenu="showCtx(event,'file')">
+    <div class="icon-img"><svg><use href="#ic-media"/></svg></div>
+    <div class="icon-label">مشغل الوسائط</div>
+  </div>
+  <div class="desktop-icon" style="top:320px;left:110px" onclick="openApp('taskman')" oncontextmenu="showCtx(event,'file')">
+    <div class="icon-img"><svg><use href="#ic-taskman"/></svg></div>
+    <div class="icon-label">إدارة المهام</div>
+  </div>
+</div>
+
+<!-- Context Menu -->
+<div id="contextMenu">
+  <div class="ctx-item" onclick="hideCtx()">📋 عرض</div>
+  <div class="ctx-item" onclick="hideCtx()">🔄 تحديث</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" onclick="hideCtx()">📁 مجلد جديد</div>
+  <div class="ctx-item" onclick="hideCtx()">📄 ملف جديد</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" onclick="hideCtx()">✂️ قص</div>
+  <div class="ctx-item" onclick="hideCtx()">📋 نسخ</div>
+  <div class="ctx-item" onclick="hideCtx()">📌 لصق</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" onclick="openApp('settings');hideCtx()">⚙️ خصائص</div>
+</div>
+
+<!-- Taskbar -->
+<div id="taskbar">
+  <div id="startBtn" onclick="toggleStart()" title="ابدأ">
+    <svg viewBox="0 0 20 20" fill="none">
+      <rect x="1" y="1" width="8.5" height="8.5" fill="#f25022"/>
+      <rect x="10.5" y="1" width="8.5" height="8.5" fill="#7fba00"/>
+      <rect x="1" y="10.5" width="8.5" height="8.5" fill="#00a4ef"/>
+      <rect x="10.5" y="10.5" width="8.5" height="8.5" fill="#ffb900"/>
+    </svg>
+  </div>
+  <div id="searchBar" onclick="focusSearch()">
+    <span class="search-icon">🔍</span>
+    <span>ابحث في Windows</span>
+  </div>
+  <div id="taskbarApps"></div>
+  <div id="taskbarRight">
+    <div class="tb-sys-icon" onclick="toggleNotif()" title="الإشعارات">💬</div>
+    <div class="tb-sys-icon" title="الصوت">🔊</div>
+    <div class="tb-sys-icon" title="الشبكة">📶</div>
+    <div id="clock" onclick="toggleNotif()">
+      <div id="clockTime">--:--</div>
+      <div id="clockDate">--</div>
+    </div>
+    <div class="tb-sys-icon" id="showDesktopBtn" onclick="showDesktop()" title="إظهار سطح المكتب" style="width:6px;padding:0;border-left:1px solid rgba(255,255,255,.2);margin-left:4px;"></div>
+  </div>
+</div>
+
+<!-- Start Menu -->
+<div id="startMenu">
+  <div class="sm-top">
+    <div class="sm-user-avatar">👤</div>
+    <div>
+      <div class="sm-username">المستخدم</div>
+    </div>
+  </div>
+  <div class="sm-search">
+    <span>🔍</span>
+    <input type="text" placeholder="ابحث في كل شيء" id="smSearch" oninput="filterTiles(this.value)">
+  </div>
+  <div class="sm-tiles" id="smTiles">
+    <div class="tile" style="background:#0078d7" onclick="openApp('explorer');closeStart()"><div class="tile-icon"><svg><use href="#ic-folder"/></svg></div><div class="tile-label">مستكشف الملفات</div></div>
+    <div class="tile" style="background:#0067c0" onclick="openApp('browser');closeStart()"><div class="tile-icon"><svg><use href="#ic-edge"/></svg></div><div class="tile-label">Edge</div></div>
+    <div class="tile" style="background:#005a9e" onclick="openApp('notepad');closeStart()"><div class="tile-icon"><svg><use href="#ic-notepad"/></svg></div><div class="tile-label">مفكرة</div></div>
+    <div class="tile" style="background:#2d2d2d" onclick="openApp('calc');closeStart()"><div class="tile-icon"><svg><use href="#ic-calc"/></svg></div><div class="tile-label">حاسبة</div></div>
+    <div class="tile" style="background:#744da9" onclick="openApp('paint');closeStart()"><div class="tile-icon"><svg><use href="#ic-paint"/></svg></div><div class="tile-label">رسام</div></div>
+    <div class="tile" style="background:#e81224" onclick="showToast('Store','قيد التطوير')"><div class="tile-icon"><svg><use href="#ic-store"/></svg></div><div class="tile-label">متجر</div></div>
+    <div class="tile" style="background:#00b4ff" onclick="openApp('media');closeStart()"><div class="tile-icon"><svg><use href="#ic-media"/></svg></div><div class="tile-label">موسيقى</div></div>
+    <div class="tile" style="background:#107c10" onclick="openApp('taskman');closeStart()"><div class="tile-icon"><svg><use href="#ic-taskman"/></svg></div><div class="tile-label">إدارة المهام</div></div>
+    <div class="tile" style="background:#767676" onclick="openApp('settings');closeStart()"><div class="tile-icon"><svg><use href="#ic-settings"/></svg></div><div class="tile-label">إعدادات</div></div>
+    <div class="tile" style="background:#d83b01" onclick="showToast('Office','قيد التطوير')"><div class="tile-icon"><svg><use href="#ic-excel"/></svg></div><div class="tile-label">Excel</div></div>
+    <div class="tile" style="background:#2b7cd3" onclick="showToast('Office','قيد التطوير')"><div class="tile-icon"><svg><use href="#ic-word"/></svg></div><div class="tile-label">Word</div></div>
+    <div class="tile" style="background:#ca5010" onclick="showToast('Office','قيد التطوير')"><div class="tile-icon"><svg><use href="#ic-ppt"/></svg></div><div class="tile-label">PowerPoint</div></div>
+  </div>
+  <div class="sm-bottom">
+    <div class="sm-bottom-btn" onclick="openApp('settings');closeStart()">⚙️ إعدادات</div>
+    <div class="sm-bottom-btn" onclick="powerMenu()">⏻ إيقاف التشغيل</div>
+  </div>
+</div>
+
+<!-- Notifications Panel -->
+<div id="notifArea">
+  <div class="notif-header">مركز الإجراءات <span class="notif-clear" onclick="clearNotifs()">مسح الكل</span></div>
+  <div id="notifList">
+    <div class="notif-item"><div class="notif-item-title">🛡️ Windows Defender</div><div class="notif-item-body">حمايتك محدّثة وجاهزة</div><div class="notif-item-time">الآن</div></div>
+    <div class="notif-item"><div class="notif-item-title">🔄 Windows Update</div><div class="notif-item-body">جهازك محدّث بالكامل</div><div class="notif-item-time">منذ ساعة</div></div>
+  </div>
+  <div class="notif-toggles">
+    <div class="notif-toggle-btn on" onclick="this.classList.toggle('on')"><div class="ntb-icon">📶</div><div class="ntb-label">Wi-Fi</div></div>
+    <div class="notif-toggle-btn on" onclick="this.classList.toggle('on')"><div class="ntb-icon">🔵</div><div class="ntb-label">بلوتوث</div></div>
+    <div class="notif-toggle-btn" onclick="this.classList.toggle('on')"><div class="ntb-icon">✈️</div><div class="ntb-label">وضع الطائرة</div></div>
+    <div class="notif-toggle-btn on" onclick="this.classList.toggle('on')"><div class="ntb-icon">🔆</div><div class="ntb-label">السطوع</div></div>
+    <div class="notif-toggle-btn" onclick="this.classList.toggle('on')"><div class="ntb-icon">🌙</div><div class="ntb-label">الوضع الليلي</div></div>
+    <div class="notif-toggle-btn on" onclick="this.classList.toggle('on')"><div class="ntb-icon">🔊</div><div class="ntb-label">الصوت</div></div>
+  </div>
+</div>
+
+<!-- Touch Controls -->
+<div id="touchControls">
+  <div class="touch-btn" id="touchpadBtn" onclick="toggleTouchpad()">🕹️ لوحة التتبع</div>
+  <div class="touch-btn" onclick="toggleVkb()">⌨️ لوحة المفاتيح</div>
+  <div class="touch-btn" onclick="minimizeAll()">🗂️ سطح المكتب</div>
+  <div class="touch-btn" onclick="enterImmersive()">⛶ ملء الشاشة</div>
+</div>
+
+<!-- Mouse Pointer (for full-screen trackpad mode) -->
+<div id="mousePointer">
+  <svg viewBox="0 0 20 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M0 0L0 18L4.5 13.5L7.5 20L10 19L7 12.5L13 12.5L0 0Z" fill="white" stroke="#333" stroke-width="1"/>
+  </svg>
+</div>
+
+<!-- Full-screen relative trackpad surface: any touch drag anywhere on screen moves the
+     cursor, a tap clicks at the cursor's position -->
+<div id="trackpadLayer"></div>
+<div id="trackpadBadge">اسحب في أي مكان لتحريك المؤشر • انقر للنقر</div>
+
+<!-- Virtual Keyboard -->
+<div id="vkb">
+  <div class="vkb-row">
+    <div class="vk" onclick="vkType('`')">~</div>
+    <div class="vk" onclick="vkType('1')">1</div>
+    <div class="vk" onclick="vkType('2')">2</div>
+    <div class="vk" onclick="vkType('3')">3</div>
+    <div class="vk" onclick="vkType('4')">4</div>
+    <div class="vk" onclick="vkType('5')">5</div>
+    <div class="vk" onclick="vkType('6')">6</div>
+    <div class="vk" onclick="vkType('7')">7</div>
+    <div class="vk" onclick="vkType('8')">8</div>
+    <div class="vk" onclick="vkType('9')">9</div>
+    <div class="vk" onclick="vkType('0')">0</div>
+    <div class="vk" onclick="vkBackspace()">⌫</div>
+  </div>
+  <div class="vkb-row">
+    <div class="vk" onclick="vkType('q')">q</div>
+    <div class="vk" onclick="vkType('w')">w</div>
+    <div class="vk" onclick="vkType('e')">e</div>
+    <div class="vk" onclick="vkType('r')">r</div>
+    <div class="vk" onclick="vkType('t')">t</div>
+    <div class="vk" onclick="vkType('y')">y</div>
+    <div class="vk" onclick="vkType('u')">u</div>
+    <div class="vk" onclick="vkType('i')">i</div>
+    <div class="vk" onclick="vkType('o')">o</div>
+    <div class="vk" onclick="vkType('p')">p</div>
+  </div>
+  <div class="vkb-row">
+    <div class="vk" onclick="vkType('a')">a</div>
+    <div class="vk" onclick="vkType('s')">s</div>
+    <div class="vk" onclick="vkType('d')">d</div>
+    <div class="vk" onclick="vkType('f')">f</div>
+    <div class="vk" onclick="vkType('g')">g</div>
+    <div class="vk" onclick="vkType('h')">h</div>
+    <div class="vk" onclick="vkType('j')">j</div>
+    <div class="vk" onclick="vkType('k')">k</div>
+    <div class="vk" onclick="vkType('l')">l</div>
+    <div class="vk wider" onclick="vkEnter()">Enter ↵</div>
+  </div>
+  <div class="vkb-row">
+    <div class="vk" onclick="vkType('z')">z</div>
+    <div class="vk" onclick="vkType('x')">x</div>
+    <div class="vk" onclick="vkType('c')">c</div>
+    <div class="vk" onclick="vkType('v')">v</div>
+    <div class="vk" onclick="vkType('b')">b</div>
+    <div class="vk" onclick="vkType('n')">n</div>
+    <div class="vk" onclick="vkType('m')">m</div>
+    <div class="vk" onclick="vkType('.')">.</div>
+    <div class="vk" onclick="vkType(',')">،</div>
+  </div>
+  <div class="vkb-row">
+    <div class="vk wide" onclick="vkbHide()">إخفاء ⬇️</div>
+    <div class="vk space" onclick="vkType(' ')">مسافة</div>
+    <div class="vk" onclick="vkType('@')">@</div>
+    <div class="vk wide" onclick="vkType('   ')">Tab ↹</div>
+  </div>
+</div>
+
+<!-- Toast Area -->
+<div id="toastArea"></div>
+
+<script>
+// ===== STATE =====
+let windows = {};
+let zCounter = 1000;
+let taskbarItems = {};
+let openStart = false;
+let openNotif = false;
+let activeWindow = null;
+let mouseX = window.innerWidth/2, mouseY = window.innerHeight/2;
+let touchpadActive = false;
+let vkbVisible = false;
+let focusedInput = null;
+let allMinimized = false;
+let calcState = { expr:'', result:'0', operator:'', operand:null, newNum:true };
+let mediaState = { playing:false, progress:0, timer:null };
+let paintState = { tool:'pen', color:'#000000', size:4, drawing:false, lastX:0, lastY:0 };
+let taskmanTimer = null;
+
+// ===== FULLSCREEN + LANDSCAPE LOCK =====
+function enterImmersive() {
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+  const finish = () => {
+    document.getElementById('fsPrompt').classList.add('hidden');
+    try {
+      if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape').then(checkOrientation).catch(checkOrientation);
+      } else { checkOrientation(); }
+    } catch (e) { checkOrientation(); }
+  };
+  if (req) {
+    try { Promise.resolve(req.call(el)).then(finish).catch(finish); }
+    catch (e) { finish(); }
+  } else { finish(); }
+}
+function checkOrientation() {
+  const hint = document.getElementById('rotateHint');
+  if (!hint) return;
+  const portrait = window.innerHeight > window.innerWidth;
+  hint.classList.toggle('show', portrait);
+}
+window.addEventListener('resize', checkOrientation);
+window.addEventListener('orientationchange', checkOrientation);
+
+// ===== BOOT =====
+setTimeout(()=>{
+  document.getElementById('bootScreen').style.opacity='0';
+  setTimeout(()=>{ document.getElementById('bootScreen').style.display='none'; }, 600);
+  document.getElementById('lockscreen').style.display='flex';
+  updateClock();
+}, 2500);
+
+document.getElementById('lockscreen').onclick = function() {
+  this.style.opacity='0';
+  setTimeout(()=>{ this.style.display='none'; showToast('Windows 10','أهلاً بك! سطح المكتب جاهز.'); }, 500);
+};
+
+// ===== CLOCK =====
+function updateClock(){
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2,'0');
+  const m = String(now.getMinutes()).padStart(2,'0');
+  document.getElementById('clockTime').textContent = h+':'+m;
+  document.getElementById('lockTime').textContent = h+':'+m;
+  const days=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+  const months=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  document.getElementById('clockDate').textContent = `${now.getDate()} ${months[now.getMonth()]}`;
+  document.getElementById('lockDate').textContent = `${days[now.getDay()]}، ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
+}
+setInterval(updateClock,1000);
+
+// ===== WINDOWS =====
+function openApp(type) {
+  if(windows[type] && !windows[type].minimized) { focusWindow(type); return; }
+  if(windows[type] && windows[type].minimized) { restoreWindow(type); return; }
+  
+  const configs = {
+    explorer: { title:'مستكشف الملفات', icon:'<svg><use href="#ic-folder"/></svg>', w:680, h:460 },
+    notepad:  { title:'المفكرة', icon:'<svg><use href="#ic-notepad"/></svg>', w:560, h:420 },
+    calc:     { title:'الآلة الحاسبة', icon:'<svg><use href="#ic-calc"/></svg>', w:300, h:440 },
+    settings: { title:'الإعدادات', icon:'<svg><use href="#ic-settings"/></svg>', w:640, h:480 },
+    taskman:  { title:'إدارة المهام', icon:'<svg><use href="#ic-taskman"/></svg>', w:680, h:460 },
+    paint:    { title:'الرسام', icon:'<svg><use href="#ic-paint"/></svg>', w:680, h:480 },
+    media:    { title:'مشغل الوسائط', icon:'<svg><use href="#ic-media"/></svg>', w:340, h:480 },
+    browser:  { title:'Microsoft Edge', icon:'<svg><use href="#ic-edge"/></svg>', w:720, h:520 },
+  };
+  const cfg = configs[type];
+  if(!cfg) return;
+
+  zCounter++;
+  const vw = window.innerWidth, vh = window.innerHeight - 48;
+  const left = Math.max(0,Math.min((vw-Math.min(cfg.w,vw))/2 + (Object.keys(windows).length*20%80), vw-100));
+  const top = Math.max(0,Math.min((vh-Math.min(cfg.h,vh))/2 + (Object.keys(windows).length*20%60), vh-100));
+  const w = Math.min(cfg.w, vw); const h = Math.min(cfg.h, vh);
+
+  const win = document.createElement('div');
+  win.className = 'window focused';
+  win.id = 'win_'+type;
+  win.style.cssText = `left:${left}px;top:${top}px;width:${w}px;height:${h}px;z-index:${zCounter}`;
+  win.innerHTML = `
+    <div class="win-titlebar" id="tb_${type}">
+      <div class="win-icon">${cfg.icon}</div>
+      <div class="win-title">${cfg.title}</div>
+      <div class="win-controls">
+        <div class="win-btn minimize" onclick="minimizeWindow('${type}')" title="تصغير">─</div>
+        <div class="win-btn maximize" onclick="maximizeWindow('${type}')" title="تكبير">□</div>
+        <div class="win-btn close" onclick="closeWindow('${type}')" title="إغلاق">✕</div>
+      </div>
+    </div>
+    <div class="win-content" id="wc_${type}">${buildAppContent(type)}</div>
+    <div class="resize-handle resize-n" data-win="${type}" data-dir="n"></div>
+    <div class="resize-handle resize-s" data-win="${type}" data-dir="s"></div>
+    <div class="resize-handle resize-w" data-win="${type}" data-dir="w"></div>
+    <div class="resize-handle resize-e" data-win="${type}" data-dir="e"></div>
+    <div class="resize-handle resize-nw" data-win="${type}" data-dir="nw"></div>
+    <div class="resize-handle resize-ne" data-win="${type}" data-dir="ne"></div>
+    <div class="resize-handle resize-sw" data-win="${type}" data-dir="sw"></div>
+    <div class="resize-handle resize-se" data-win="${type}" data-dir="se"></div>
+  `;
+  document.getElementById('desktop').appendChild(win);
+  windows[type] = { el:win, type, minimized:false, maximized:false, rect:{ left, top, width:w, height:h } };
+  activeWindow = type;
+  
+  addTaskbarItem(type, cfg.icon, cfg.title);
+  setupDrag(type);
+  setupResize(type);
+  initApp(type);
+  
+  win.addEventListener('pointerdown', ()=>focusWindow(type));
+}
+
+function buildAppContent(type) {
+  if(type==='explorer') return `
+    <div class="explorer">
+      <div class="explorer-toolbar">
+        <button class="exp-btn" onclick="expNav(-1)">← رجوع</button>
+        <button class="exp-btn" onclick="expNav(1)">→ أمام</button>
+        <button class="exp-btn" onclick="expRefresh()">🔄</button>
+        <input class="exp-addr" id="expAddr" value="هذا الكمبيوتر" readonly>
+      </div>
+      <div class="explorer-body">
+        <div class="explorer-sidebar">
+          <div class="sidebar-item active" data-key="pc" onclick="expOpen('pc')">💻 هذا الكمبيوتر</div>
+          <div class="sidebar-item" data-key="desktop" onclick="expOpen('desktop')">🖥️ سطح المكتب</div>
+          <div class="sidebar-item" data-key="docs" onclick="expOpen('docs')">📄 المستندات</div>
+          <div class="sidebar-item" data-key="pics" onclick="expOpen('pics')">🖼️ الصور</div>
+          <div class="sidebar-item" data-key="music" onclick="expOpen('music')">🎵 الموسيقى</div>
+          <div class="sidebar-item" data-key="videos" onclick="expOpen('videos')">🎬 مقاطع الفيديو</div>
+          <div class="sidebar-item" data-key="downloads" onclick="expOpen('downloads')">⬇️ التنزيلات</div>
+          <div class="sidebar-item" data-key="c" onclick="expOpen('c')">💿 القرص C</div>
+        </div>
+        <div class="explorer-files" id="expFiles"></div>
+      </div>
+    </div>`;
+  if(type==='notepad') return `
+    <div class="notepad">
+      <div class="np-menu">
+        <div class="np-menu-item" onclick="npNew()">جديد</div>
+        <div class="np-menu-item" onclick="npSave()">💾 حفظ</div>
+        <div class="np-menu-item" onclick="npOpenFile()">📂 فتح</div>
+        <div class="np-menu-item" onclick="npEdit()">تحديد الكل</div>
+      </div>
+      <textarea class="np-textarea" id="npText" placeholder="اكتب هنا..."></textarea>
+      <input type="file" id="npFileInput" accept=".txt,text/plain" style="display:none" onchange="npHandleFile(event)">
+    </div>`;
+  if(type==='calc') return `
+    <div class="calc">
+      <div class="calc-display">
+        <div class="calc-expr" id="calcExpr"></div>
+        <div class="calc-result" id="calcResult">0</div>
+      </div>
+      <div class="calc-grid">
+        <div class="calc-btn clr" onclick="calcClear()">C</div>
+        <div class="calc-btn op" onclick="calcOp('%')">%</div>
+        <div class="calc-btn op" onclick="calcOp('±')">±</div>
+        <div class="calc-btn op" onclick="calcOp('÷')">÷</div>
+        <div class="calc-btn" onclick="calcNum('7')">7</div>
+        <div class="calc-btn" onclick="calcNum('8')">8</div>
+        <div class="calc-btn" onclick="calcNum('9')">9</div>
+        <div class="calc-btn op" onclick="calcOp('×')">×</div>
+        <div class="calc-btn" onclick="calcNum('4')">4</div>
+        <div class="calc-btn" onclick="calcNum('5')">5</div>
+        <div class="calc-btn" onclick="calcNum('6')">6</div>
+        <div class="calc-btn op" onclick="calcOp('-')">−</div>
+        <div class="calc-btn" onclick="calcNum('1')">1</div>
+        <div class="calc-btn" onclick="calcNum('2')">2</div>
+        <div class="calc-btn" onclick="calcNum('3')">3</div>
+        <div class="calc-btn op" onclick="calcOp('+')">+</div>
+        <div class="calc-btn span2" onclick="calcNum('0')">0</div>
+        <div class="calc-btn" onclick="calcNum('.')">.</div>
+        <div class="calc-btn eq" onclick="calcEquals()">=</div>
+      </div>
+    </div>`;
+  if(type==='settings') return `
+    <div class="settings">
+      <div class="settings-sidebar">
+        <div class="settings-sidebar-header">⚙️ الإعدادات</div>
+        <div class="settings-item active" onclick="settingsTab('system',this)">🖥️ النظام</div>
+        <div class="settings-item" onclick="settingsTab('devices',this)">🔌 الأجهزة</div>
+        <div class="settings-item" onclick="settingsTab('network',this)">📶 الشبكة</div>
+        <div class="settings-item" onclick="settingsTab('persona',this)">🎨 التخصيص</div>
+        <div class="settings-item" onclick="settingsTab('accounts',this)">👤 الحسابات</div>
+        <div class="settings-item" onclick="settingsTab('security',this)">🛡️ الأمان</div>
+        <div class="settings-item" onclick="settingsTab('update',this)">🔄 التحديث</div>
+      </div>
+      <div class="settings-content" id="settingsContent"><div id="settings-system">${buildSettingsSystem()}</div></div>
+    </div>`;
+  if(type==='taskman') return `
+    <div class="taskman">
+      <div class="taskman-tabs">
+        <div class="tm-tab active" onclick="tmTab('processes',this)">العمليات</div>
+        <div class="tm-tab" onclick="tmTab('perf',this)">الأداء</div>
+        <div class="tm-tab" onclick="tmTab('startup',this)">بدء التشغيل</div>
+      </div>
+      <div class="taskman-body" id="tmBody">${buildTmProcesses()}</div>
+    </div>`;
+  if(type==='paint') return `
+    <div class="paint-app">
+      <div class="paint-toolbar">
+        <div class="paint-tool active" id="pt_pen" onclick="setPaintTool('pen')" title="قلم">✏️</div>
+        <div class="paint-tool" id="pt_eraser" onclick="setPaintTool('eraser')" title="ممحاة">🧽</div>
+        <div class="paint-tool" id="pt_fill" onclick="setPaintTool('fill')" title="تعبئة">🪣</div>
+        <div class="paint-tool" id="pt_rect" onclick="setPaintTool('rect')" title="مستطيل">▭</div>
+        <div class="paint-colors">
+          ${['#000000','#ffffff','#ff0000','#00b050','#0070c0','#ffff00','#ff6600','#9900cc','#00cccc','#ff99cc','#663300','#888888'].map(c=>`<div class="paint-color ${c==='#000000'?'selected':''}" style="background:${c}" onclick="setPaintColor('${c}',this)"></div>`).join('')}
+        </div>
+        <div class="paint-size">🖊️<input type="range" min="1" max="30" value="4" id="paintSize" oninput="paintState.size=+this.value"></div>
+        <button class="exp-btn" onclick="clearCanvas()">مسح الكل</button>
+        <button class="exp-btn" onclick="saveCanvas()">💾 حفظ</button>
+      </div>
+      <div class="paint-canvas-wrap">
+        <canvas class="paint-canvas" id="paintCanvas" width="800" height="500"></canvas>
+      </div>
+    </div>`;
+  if(type==='media') return `
+    <div class="mediaplayer">
+      <div class="mp-display">
+        <div class="mp-cover" id="mpCover">🎵</div>
+        <div class="mp-title" id="mpTitle">Windows Startup Sound</div>
+        <div class="mp-artist" id="mpArtist">Microsoft Corporation</div>
+      </div>
+      <div class="mp-progress">
+        <div class="mp-bar" onclick="mpSeek(event,this)"><div class="mp-fill" id="mpFill"></div></div>
+        <div class="mp-time"><span id="mpCur">0:00</span><span id="mpDur">3:24</span></div>
+      </div>
+      <div class="mp-controls">
+        <div class="mp-btn" onclick="mpPrev()">⏮</div>
+        <div class="mp-btn play" id="mpPlayBtn" onclick="mpToggle()">▶</div>
+        <div class="mp-btn" onclick="mpNext()">⏭</div>
+        <div class="mp-btn" onclick="mpShuffle()">🔀</div>
+        <div class="mp-btn" onclick="mpRepeat()">🔁</div>
+      </div>
+    </div>`;
+  if(type==='browser') return `
+    <div class="browser">
+      <div class="browser-bar">
+        <div class="browser-nav">
+          <div class="brow-btn">←</div>
+          <div class="brow-btn">→</div>
+          <div class="brow-btn" onclick="browRefresh()">🔄</div>
+          <div class="brow-btn" onclick="browHome()" title="الصفحة الرئيسية">🏠</div>
+        </div>
+        <input class="browser-addr" id="browAddr" value="edge://newtab" onkeydown="if(event.key==='Enter')browNav(this.value)">
+        <div class="brow-btn">⭐</div>
+      </div>
+      <div class="browser-content home" id="browContent">
+        <div class="bing-logo">Bing</div>
+        <div style="font-size:13px;color:#555;margin-bottom:8px">محرك بحث مايكروسوفت</div>
+        <div class="bing-search">
+          <input class="bing-input" id="bingInput" placeholder="ابحث في الويب..." onkeydown="if(event.key==='Enter')bingSearch(this.value)">
+          <button class="bing-go" onclick="bingSearch(document.getElementById('bingInput').value)">🔍</button>
+        </div>
+        <div style="font-size:11px;color:#999;margin-top:10px">بحث ومواقع حقيقية من الإنترنت 🌐</div>
+      </div>
+    </div>`;
+  return '<div style="padding:20px;color:#333;">التطبيق قيد التطوير...</div>';
+}
+
+function buildSettingsSystem() {
+  return `
+    <h2>النظام</h2>
+    <div class="settings-section">
+      <h3>العرض</h3>
+      <div class="setting-row"><label>السطوع</label><input type="range" min="0" max="100" value="80" style="width:120px"></div>
+      <div class="setting-row"><label>دقة الشاشة</label><select class="setting-select"><option>1920 × 1080</option><option>1366 × 768</option></select></div>
+    </div>
+    <div class="settings-section">
+      <h3>الصوت</h3>
+      <div class="setting-row"><label>مستوى الصوت الرئيسي</label><input type="range" min="0" max="100" value="75" style="width:120px"></div>
+      <div class="setting-row"><label>كتم الصوت</label><div class="toggle" onclick="this.classList.toggle('on')"></div></div>
+    </div>
+    <div class="settings-section">
+      <h3>الطاقة</h3>
+      <div class="setting-row"><label>وضع الطاقة</label><select class="setting-select"><option>متوازن</option><option>أداء عالٍ</option><option>توفير الطاقة</option></select></div>
+      <div class="setting-row"><label>إيقاف الشاشة بعد</label><select class="setting-select"><option>5 دقائق</option><option>10 دقائق</option><option>أبداً</option></select></div>
+    </div>
+    <div class="settings-section">
+      <h3>مواصفات جهازك الحقيقية</h3>
+      <div id="realSysInfo" style="font-size:13px;color:#555;line-height:2">جارِ فحص الجهاز...</div>
+    </div>`;
+}
+
+function getRealSystemInfo() {
+  const lines = [];
+  lines.push(`أنوية المعالج (تقريبي): ${navigator.hardwareConcurrency || 'غير معروف'} نواة منطقية`);
+  if(navigator.deviceMemory) lines.push(`الذاكرة التقريبية (RAM): ${navigator.deviceMemory} GB أو أكثر`);
+  lines.push(`نظام التشغيل/المنصة: ${navigator.platform || navigator.userAgentData?.platform || 'غير معروف'}`);
+  lines.push(`اللغة: ${navigator.language}`);
+  const dpr = window.devicePixelRatio || 1;
+  lines.push(`دقة الشاشة الفعلية: ${screen.width * dpr} × ${screen.height * dpr} بكسل`);
+  lines.push(`دقة الشاشة المنطقية (CSS): ${screen.width} × ${screen.height} (نسبة البكسل ${dpr}x)`);
+  lines.push(`عمق الألوان: ${screen.colorDepth}-بت`);
+  lines.push(`حالة الاتصال: ${navigator.onLine ? '✅ متصل بالإنترنت' : '❌ غير متصل'}`);
+  if(navigator.connection) {
+    const c = navigator.connection;
+    if(c.effectiveType) lines.push(`نوع الاتصال: ${c.effectiveType}`);
+    if(c.downlink) lines.push(`سرعة تقريبية: ${c.downlink} Mbps`);
+  }
+  // GPU info via WebGL
+  try {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    if(gl) {
+      const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+      if(dbg) {
+        const renderer = gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL);
+        lines.push(`كرت الشاشة (GPU): ${renderer}`);
+      }
+    }
+  } catch(e) {}
+  return lines;
+}
+
+function renderRealSystemInfo() {
+  const el = document.getElementById('realSysInfo');
+  if(!el) return;
+  let lines = getRealSystemInfo();
+  el.innerHTML = lines.map(l=>`<div>${l}</div>`).join('') + `<div id="batteryLine">🔋 البطارية: جارِ القراءة...</div>`;
+  if(navigator.getBattery) {
+    navigator.getBattery().then(bat=>{
+      const upd = () => {
+        const bEl = document.getElementById('batteryLine');
+        if(!bEl) return;
+        bEl.textContent = `🔋 البطارية: ${Math.round(bat.level*100)}% ${bat.charging ? '(جاري الشحن ⚡)' : ''}`;
+      };
+      upd();
+      bat.addEventListener('levelchange', upd);
+      bat.addEventListener('chargingchange', upd);
+    }).catch(()=>{
+      const bEl = document.getElementById('batteryLine');
+      if(bEl) bEl.textContent = '🔋 البطارية: غير متوفرة في هذا المتصفح';
+    });
+  } else {
+    const bEl = document.getElementById('batteryLine');
+    if(bEl) bEl.textContent = '🔋 البطارية: غير متوفرة في هذا المتصفح';
+  }
+}
+
+function buildTmProcesses() {
+  const procs = [
+    {name:'System',icon:'⚙️',cpu:0.1,mem:12,disk:0.1},
+    {name:'explorer.exe',icon:'📁',cpu:0.5,mem:48,disk:0.2},
+    {name:'svchost.exe',icon:'🔧',cpu:0.2,mem:24,disk:0},
+    {name:'RuntimeBroker.exe',icon:'🔒',cpu:0.1,mem:18,disk:0},
+    {name:'SearchHost.exe',icon:'🔍',cpu:0.8,mem:62,disk:0.5},
+    {name:'ctfmon.exe',icon:'⌨️',cpu:0,mem:8,disk:0},
+    {name:'MsMpEng.exe',icon:'🛡️',cpu:1.2,mem:85,disk:2.1},
+    {name:'dwm.exe',icon:'🖥️',cpu:0.3,mem:44,disk:0},
+    {name:'taskhostw.exe',icon:'⚙️',cpu:0.1,mem:10,disk:0},
+    {name:'WmiPrvSE.exe',icon:'📡',cpu:0.2,mem:15,disk:0},
+  ];
+  const jitter = v => Math.max(0, +(v + (Math.random()*0.6-0.3)).toFixed(1));
+  return `<table class="tm-table">
+    <tr><th>الاسم</th><th>وحدة المعالجة</th><th>الذاكرة</th><th>القرص</th></tr>
+    ${procs.map(p=>{
+      const cpu = jitter(p.cpu);
+      const mem = Math.max(4, Math.round(p.mem + (Math.random()*6-3)));
+      return `<tr>
+      <td>${p.icon} ${p.name}</td>
+      <td><div class="usage-bar"><div class="usage-fill" style="width:${Math.min(cpu*10,100)}%;background:#0078d7"></div></div> ${cpu}%</td>
+      <td><div class="usage-bar"><div class="usage-fill" style="width:${Math.min(mem/2,100)}%;background:#107c10"></div></div> ${mem} MB</td>
+      <td>${p.disk} MB/s</td>
+    </tr>`;}).join('')}
+  </table>`;
+}
+
+function initApp(type) {
+  if(type==='explorer') { expHistory=['pc']; expHistIdx=0; expRenderFolder('pc'); }
+  if(type==='settings') setTimeout(renderRealSystemInfo, 50);
+  if(type==='paint') setTimeout(initPaint,50);
+  if(type==='taskman') startTaskman();
+}
+
+// ===== CALC =====
+function calcNum(n) {
+  const el = document.getElementById('calcResult');
+  if(!el) return;
+  if(calcState.newNum) { calcState.result = n==='.'?'0.':n; calcState.newNum=false; }
+  else if(n==='.' && calcState.result.includes('.')) return;
+  else calcState.result += n;
+  el.textContent = calcState.result;
+}
+function calcOp(op) {
+  const el = document.getElementById('calcResult');
+  const exEl = document.getElementById('calcExpr');
+  if(!el||!exEl) return;
+  if(op==='±') { calcState.result = String(-parseFloat(calcState.result)||0); el.textContent=calcState.result; return; }
+  if(op==='%') { calcState.result = String(parseFloat(calcState.result)/100); el.textContent=calcState.result; return; }
+  calcState.operand = parseFloat(calcState.result);
+  calcState.operator = op;
+  exEl.textContent = calcState.result + ' ' + op;
+  calcState.newNum = true;
+}
+function calcEquals() {
+  const el = document.getElementById('calcResult');
+  const exEl = document.getElementById('calcExpr');
+  if(!el||!exEl||calcState.operand===null) return;
+  const a = calcState.operand, b = parseFloat(calcState.result);
+  let r;
+  if(calcState.operator==='+'||calcState.operator==='add') r=a+b;
+  else if(calcState.operator==='-') r=a-b;
+  else if(calcState.operator==='×') r=a*b;
+  else if(calcState.operator==='÷') r=b!==0?a/b:'خطأ';
+  else r=b;
+  exEl.textContent = a + ' ' + calcState.operator + ' ' + b + ' =';
+  calcState.result = String(Math.round(r*1e10)/1e10);
+  el.textContent = calcState.result;
+  calcState.newNum = true; calcState.operand = null;
+}
+function calcClear() {
+  calcState={expr:'',result:'0',operator:'',operand:null,newNum:true};
+  const el=document.getElementById('calcResult');const ex=document.getElementById('calcExpr');
+  if(el)el.textContent='0';if(ex)ex.textContent='';
+}
+
+// ===== EXPLORER =====
+const expFolders = {
+  pc:{ addr:'هذا الكمبيوتر', files:[
+    {icon:'💿',name:'القرص المحلي (C:)'},
+    {icon:'💿',name:'القرص المحلي (D:)'},
+    {icon:'📁',name:'المستندات'},
+    {icon:'🖼️',name:'الصور'},
+    {icon:'🎵',name:'الموسيقى'},
+    {icon:'🎬',name:'الفيديو'},
+    {icon:'⬇️',name:'التنزيلات'},
+  ]},
+  desktop:{ addr:'سطح المكتب', files:[
+    {icon:'📁',name:'مجلد جديد'},
+    {icon:'📄',name:'readme.txt'},
+    {icon:'🖼️',name:'wallpaper.jpg'},
+  ]},
+  docs:{ addr:'المستندات', files:[
+    {icon:'📄',name:'ملف Word.docx'},
+    {icon:'📊',name:'جدول Excel.xlsx'},
+    {icon:'📑',name:'عرض تقديمي.pptx'},
+    {icon:'📝',name:'ملاحظات.txt'},
+  ]},
+  pics:{ addr:'الصور', files:[
+    {icon:'🖼️',name:'صورة1.jpg'},{icon:'🖼️',name:'صورة2.png'},
+    {icon:'🖼️',name:'لقطة شاشة.png'},{icon:'📁',name:'ألبوم العائلة'},
+  ]},
+  music:{ addr:'الموسيقى', files:[
+    {icon:'🎵',name:'track01.mp3'},{icon:'🎵',name:'track02.mp3'},
+    {icon:'🎵',name:'music.flac'},{icon:'📁',name:'ألبومات'},
+  ]},
+  videos:{ addr:'مقاطع الفيديو', files:[
+    {icon:'🎬',name:'فيلم.mp4'},{icon:'🎬',name:'مقطع.avi'},
+  ]},
+  downloads:{ addr:'التنزيلات', files:[
+    {icon:'📦',name:'setup.exe'},{icon:'📄',name:'document.pdf'},
+    {icon:'🗜️',name:'archive.zip'},
+  ]},
+  c:{ addr:'C:\\', files:[
+    {icon:'📁',name:'Windows'},{icon:'📁',name:'Program Files'},
+    {icon:'📁',name:'Program Files (x86)'},{icon:'📁',name:'Users'},
+    {icon:'📁',name:'ProgramData'},
+  ]},
+};
+let expHistory = ['pc'];
+let expHistIdx = 0;
+function expRenderFolder(key) {
+  const data = expFolders[key]||expFolders.pc;
+  const addr = document.getElementById('expAddr');
+  const files = document.getElementById('expFiles');
+  if(addr) addr.value = data.addr;
+  if(files) {
+    files.innerHTML = data.files.map(f=>`
+      <div class="file-item" onclick="this.classList.toggle('selected')" ondblclick="showToast('مستكشف الملفات','فتح: ${f.name}')">
+        <div class="fi-icon">${f.icon}</div>
+        <div class="fi-name">${f.name}</div>
+      </div>`).join('');
+  }
+  document.querySelectorAll('.sidebar-item').forEach(el=>{
+    el.classList.toggle('active', el.dataset.key===key);
+  });
+}
+function expOpen(key, skipHistory) {
+  if(!skipHistory) {
+    // discard any forward history and push the new folder
+    expHistory = expHistory.slice(0, expHistIdx+1);
+    expHistory.push(key);
+    expHistIdx = expHistory.length-1;
+  }
+  expRenderFolder(key);
+}
+function expNav(d) {
+  const newIdx = expHistIdx + d;
+  if(newIdx < 0) { showToast('مستكشف الملفات','لا يوجد مجلد للخلف'); return; }
+  if(newIdx > expHistory.length-1) { showToast('مستكشف الملفات','لا يوجد مجلد للأمام'); return; }
+  expHistIdx = newIdx;
+  expRenderFolder(expHistory[expHistIdx]);
+}
+function expRefresh() { expRenderFolder(expHistory[expHistIdx]); showToast('مستكشف الملفات','تم التحديث ✓'); }
+
+// ===== SETTINGS =====
+function settingsTab(tab, el) {
+  document.querySelectorAll('.settings-item').forEach(e=>e.classList.remove('active'));
+  el.classList.add('active');
+  const tabs = {
+    system: buildSettingsSystem(),
+    devices: `<h2>الأجهزة</h2><p style="color:#555;font-size:13px">لا توجد أجهزة غير معروفة.<br>الطابعة: غير متصلة<br>USB: متصل</p>`,
+    network: `<h2>الشبكة والإنترنت</h2><div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px"><div style="font-size:14px;font-weight:600;color:#0078d7">✅ متصل بالإنترنت</div><div style="font-size:12px;color:#555">Wi-Fi - شبكتي المنزلية</div><div style="font-size:12px;color:#888">عنوان IP: 192.168.1.10</div></div>`,
+    persona: `<h2>التخصيص</h2><div class="settings-section"><h3>الخلفية</h3><div class="setting-row"><label>نوع الخلفية</label><select class="setting-select"><option>صورة</option><option>لون خالص</option><option>عرض شرائح</option></select></div></div>`,
+    accounts: `<h2>الحسابات</h2><div style="display:flex;align-items:center;gap:16px;padding:12px 0"><div style="width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,#0078d7,#00b4ff);display:flex;align-items:center;justify-content:center;font-size:28px">👤</div><div><div style="font-size:16px;font-weight:500">المستخدم</div><div style="font-size:13px;color:#888">حساب محلي</div></div></div>`,
+    security: `<h2>الأمان والصيانة</h2><div class="settings-section"><h3>الحماية</h3><div class="setting-row"><label>Windows Defender</label><div class="toggle on" onclick="this.classList.toggle('on')"></div></div><div class="setting-row"><label>جدار الحماية</label><div class="toggle on" onclick="this.classList.toggle('on')"></div></div></div>`,
+    update: `<h2>Windows Update</h2><div style="text-align:center;padding:20px"><div style="font-size:40px">✅</div><div style="font-size:14px;font-weight:500;margin-top:8px">جهازك محدّث</div><div style="font-size:12px;color:#888;margin-top:4px">آخر تحديث: اليوم</div></div>`,
+  };
+  document.getElementById('settingsContent').innerHTML = `<div>${tabs[tab]||tabs.system}</div>`;
+  if(tab==='system' || !tab) setTimeout(renderRealSystemInfo, 30);
+}
+
+// ===== TASK MANAGER =====
+function tmTab(tab, el) {
+  document.querySelectorAll('.tm-tab').forEach(e=>e.classList.remove('active'));
+  el.classList.add('active');
+  const body = document.getElementById('tmBody');
+  if(!body) return;
+  if(tab==='processes') { body.innerHTML=buildTmProcesses(); }
+  else if(tab==='perf') {
+    body.innerHTML = `<div style="padding:16px;font-size:13px;color:#333">
+      <div style="margin-bottom:12px"><strong>CPU</strong> - ${(Math.random()*15+5).toFixed(1)}%
+        <div class="usage-bar" style="height:16px;margin-top:4px"><div class="usage-fill" style="width:${Math.random()*15+5}%;background:#0078d7;height:100%"></div></div></div>
+      <div style="margin-bottom:12px"><strong>الذاكرة</strong> - 4.2 / 16 GB (26%)
+        <div class="usage-bar" style="height:16px;margin-top:4px"><div class="usage-fill" style="width:26%;background:#107c10;height:100%"></div></div></div>
+      <div><strong>القرص</strong> - ${(Math.random()*5).toFixed(1)} MB/s
+        <div class="usage-bar" style="height:16px;margin-top:4px"><div class="usage-fill" style="width:${Math.random()*20}%;background:#e81123;height:100%"></div></div></div>
+    </div>`;
+  } else {
+    body.innerHTML=`<table class="tm-table"><tr><th>البرنامج</th><th>الحالة</th><th>التأثير</th></tr>
+      <tr><td>🔍 SearchHost</td><td>✅ ممكّن</td><td>منخفض</td></tr>
+      <tr><td>🛡️ Windows Defender</td><td>✅ ممكّن</td><td>منخفض</td></tr>
+      <tr><td>🔄 Windows Update</td><td>✅ ممكّن</td><td>منخفض</td></tr>
+    </table>`;
+  }
+}
+function startTaskman() {
+  if(taskmanTimer) clearInterval(taskmanTimer);
+  taskmanTimer = setInterval(()=>{
+    if(!document.getElementById('win_taskman')) { clearInterval(taskmanTimer); taskmanTimer=null; return; }
+    const activeTab = document.querySelector('.tm-tab.active');
+    if(!activeTab) return;
+    const label = activeTab.textContent;
+    if(label.includes('الأداء')) tmTab('perf', activeTab);
+    else if(label.includes('العمليات')) tmTab('processes', activeTab);
+  },2200);
+}
+
+// ===== PAINT =====
+function initPaint() {
+  const canvas = document.getElementById('paintCanvas');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  
+  function getPos(e) {
+    const r = canvas.getBoundingClientRect();
+    const t = e.touches ? e.touches[0] : e;
+    return { x:(t.clientX-r.left)*(canvas.width/r.width), y:(t.clientY-r.top)*(canvas.height/r.height) };
+  }
+  function startDraw(e) {
+    e.preventDefault();
+    paintState.drawing=true;
+    const {x,y}=getPos(e);
+    paintState.lastX=x; paintState.lastY=y;
+    if(paintState.tool==='fill') { fillCanvas(ctx,x,y,paintState.color); paintState.drawing=false; }
+    if(paintState.tool==='rect') { paintState.snapshot = ctx.getImageData(0,0,canvas.width,canvas.height); }
+  }
+  function draw(e) {
+    if(!paintState.drawing) return; e.preventDefault();
+    const {x,y}=getPos(e);
+    ctx.beginPath();
+    ctx.lineWidth=paintState.size; ctx.lineCap='round'; ctx.lineJoin='round';
+    if(paintState.tool==='eraser') ctx.strokeStyle='#ffffff';
+    else if(paintState.tool==='rect') {
+      if(paintState.snapshot) ctx.putImageData(paintState.snapshot,0,0);
+      ctx.lineWidth=paintState.size;
+      ctx.strokeStyle=paintState.color;
+      ctx.strokeRect(paintState.lastX,paintState.lastY,x-paintState.lastX,y-paintState.lastY);
+      return;
+    }
+    else ctx.strokeStyle=paintState.color;
+    ctx.moveTo(paintState.lastX,paintState.lastY);
+    ctx.lineTo(x,y); ctx.stroke();
+    paintState.lastX=x; paintState.lastY=y;
+  }
+  function stopDraw() { paintState.drawing=false; paintState.snapshot=null; }
+  
+  canvas.addEventListener('pointerdown',startDraw);
+  canvas.addEventListener('pointermove',draw);
+  canvas.addEventListener('pointerup',stopDraw);
+  canvas.addEventListener('touchstart',startDraw,{passive:false});
+  canvas.addEventListener('touchmove',draw,{passive:false});
+  canvas.addEventListener('touchend',stopDraw);
+}
+function hexToRgb(hex) {
+  hex = hex.replace('#','');
+  const n = parseInt(hex,16);
+  return { r:(n>>16)&255, g:(n>>8)&255, b:n&255 };
+}
+function fillCanvas(ctx,x,y,color) {
+  const canvas = ctx.canvas;
+  const w = canvas.width, h = canvas.height;
+  const sx = Math.floor(x), sy = Math.floor(y);
+  if (sx<0 || sy<0 || sx>=w || sy>=h) return;
+  const img = ctx.getImageData(0,0,w,h);
+  const data = img.data;
+  const startIdx = (sy*w+sx)*4;
+  const tR=data[startIdx], tG=data[startIdx+1], tB=data[startIdx+2], tA=data[startIdx+3];
+  const fill = hexToRgb(color);
+  if (fill.r===tR && fill.g===tG && fill.b===tB && tA===255) return;
+  const tol = 24;
+  const visited = new Uint8Array(w*h);
+  const stack = [[sx,sy]];
+  while (stack.length) {
+    const [cx,cy] = stack.pop();
+    if (cx<0||cy<0||cx>=w||cy>=h) continue;
+    const vIdx = cy*w+cx;
+    if (visited[vIdx]) continue;
+    const i = vIdx*4;
+    if (Math.abs(data[i]-tR)>tol || Math.abs(data[i+1]-tG)>tol || Math.abs(data[i+2]-tB)>tol || Math.abs(data[i+3]-tA)>tol) continue;
+    visited[vIdx] = 1;
+    data[i]=fill.r; data[i+1]=fill.g; data[i+2]=fill.b; data[i+3]=255;
+    stack.push([cx+1,cy],[cx-1,cy],[cx,cy+1],[cx,cy-1]);
+  }
+  ctx.putImageData(img,0,0);
+}
+function setPaintTool(tool) {
+  paintState.tool=tool;
+  document.querySelectorAll('.paint-tool').forEach(e=>e.classList.remove('active'));
+  const el=document.getElementById('pt_'+tool); if(el)el.classList.add('active');
+}
+function setPaintColor(c,el) {
+  paintState.color=c;
+  document.querySelectorAll('.paint-color').forEach(e=>e.classList.remove('selected'));
+  el.classList.add('selected');
+}
+function clearCanvas() {
+  const canvas=document.getElementById('paintCanvas'); if(!canvas)return;
+  const ctx=canvas.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+}
+function saveCanvas() { showToast('الرسام','تم حفظ الصورة ✓'); }
+
+// ===== MEDIA =====
+const mpTracks = [
+  {title:'Windows Startup Sound',artist:'Microsoft Corporation',dur:'3:24'},
+  {title:'Bliss (Remix)',artist:'Charles O\'Rear',dur:'4:12'},
+  {title:'Wandering Star',artist:'Windows Audio Team',dur:'2:58'},
+];
+let mpIdx = 0;
+function mpToggle() {
+  mediaState.playing = !mediaState.playing;
+  const btn=document.getElementById('mpPlayBtn');
+  const cover=document.getElementById('mpCover');
+  if(btn) btn.textContent = mediaState.playing?'⏸':'▶';
+  if(cover) { if(mediaState.playing) cover.classList.add('playing'); else cover.classList.remove('playing'); }
+  if(mediaState.playing) {
+    mediaState.timer = setInterval(()=>{
+      mediaState.progress = Math.min(mediaState.progress+0.5,100);
+      const fill=document.getElementById('mpFill'); if(fill) fill.style.width=mediaState.progress+'%';
+      const cur=document.getElementById('mpCur');
+      const secs=Math.floor(mediaState.progress*2.04);
+      if(cur) cur.textContent=Math.floor(secs/60)+':'+(secs%60<10?'0':'')+secs%60;
+      if(mediaState.progress>=100) { mpNext(); }
+    },500);
+  } else { clearInterval(mediaState.timer); }
+}
+function mpNext() {
+  mpIdx=(mpIdx+1)%mpTracks.length; mediaState.progress=0;
+  const t=mpTracks[mpIdx];
+  const ti=document.getElementById('mpTitle');const ar=document.getElementById('mpArtist');const dur=document.getElementById('mpDur');
+  if(ti)ti.textContent=t.title;if(ar)ar.textContent=t.artist;if(dur)dur.textContent=t.dur;
+}
+function mpPrev() { mpIdx=(mpIdx+mpTracks.length-1)%mpTracks.length; mpNext(); mpIdx=(mpIdx+mpTracks.length-1)%mpTracks.length; mpNext(); }
+function mpSeek(e,bar) { const r=bar.getBoundingClientRect(); mediaState.progress=(e.clientX-r.left)/r.width*100; }
+function mpShuffle() { showToast('مشغل الوسائط','🔀 العشوائي مفعّل'); }
+function mpRepeat() { showToast('مشغل الوسائط','🔁 التكرار مفعّل'); }
+
+// ===== BROWSER (real internet) =====
+function normalizeUrl(input) {
+  const s = (input||'').trim();
+  if (!s) return null;
+  if (/^https?:\/\//i.test(s)) return s;
+  if (/^[a-z0-9-]+(\.[a-z0-9-]+)+([/?#].*)?$/i.test(s) && !s.includes(' ')) return 'https://' + s;
+  return null;
+}
+function browNav(raw) {
+  const content = document.getElementById('browContent');
+  const addr = document.getElementById('browAddr');
+  if (!content || !raw || !raw.trim()) return;
+  const direct = normalizeUrl(raw);
+  const url = direct || ('https://www.bing.com/search?q=' + encodeURIComponent(raw));
+  if (addr) addr.value = url;
+  content.classList.remove('home');
+  content.innerHTML = `
+    <div style="display:flex;flex-direction:column;flex:1;width:100%;align-self:stretch">
+      <iframe src="${url}" style="flex:1;width:100%;border:none;background:#fff"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+        referrerpolicy="no-referrer-when-downgrade"></iframe>
+      <div style="background:#fff3cd;border-top:1px solid #ffe69c;padding:6px 10px;font-size:11px;color:#664d03;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+        <span>بعض المواقع (مثل Google وFacebook) تمنع عرضها داخل نافذة مدمجة لأسباب أمنية</span>
+        <a href="${url}" target="_blank" rel="noopener noreferrer" style="background:#0078d7;color:#fff;padding:4px 10px;border-radius:3px;text-decoration:none;white-space:nowrap">فتح في تبويب حقيقي ↗</a>
+      </div>
+    </div>`;
+}
+function browHome() {
+  const content = document.getElementById('browContent');
+  const addr = document.getElementById('browAddr');
+  if (addr) addr.value = 'edge://newtab';
+  if (!content) return;
+  content.classList.add('home');
+  content.innerHTML = `
+    <div class="bing-logo">Bing</div>
+    <div style="font-size:13px;color:#555;margin-bottom:8px">محرك بحث مايكروسوفت</div>
+    <div class="bing-search">
+      <input class="bing-input" id="bingInput" placeholder="ابحث في الويب..." onkeydown="if(event.key==='Enter')bingSearch(this.value)">
+      <button class="bing-go" onclick="bingSearch(document.getElementById('bingInput').value)">🔍</button>
+    </div>
+    <div style="font-size:11px;color:#999;margin-top:10px">بحث ومواقع حقيقية من الإنترنت 🌐</div>`;
+}
+function browRefresh() {
+  const f = document.querySelector('#browContent iframe');
+  if (f) { f.src = f.src; showToast('Edge', 'جاري التحديث...'); }
+  else showToast('Edge', 'لا توجد صفحة لتحديثها');
+}
+function bingSearch(q) { if (!q || !q.trim()) return; browNav(q); }
+
+// ===== NOTEPAD =====
+function npSave() {
+  const ta = document.getElementById('npText');
+  const text = ta ? ta.value : '';
+  const blob = new Blob([text], { type:'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'مستند جديد.txt';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 2000);
+  showToast('مفكرة','تم حفظ الملف على جهازك ✓');
+}
+function npOpenFile() {
+  const input = document.getElementById('npFileInput');
+  if (input) input.click();
+}
+function npHandleFile(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const ta = document.getElementById('npText');
+    if (ta) ta.value = ev.target.result;
+    showToast('مفكرة', 'تم فتح: ' + file.name);
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+function npNew() {
+  const ta = document.getElementById('npText');
+  if (ta) ta.value = '';
+  showToast('مفكرة','مستند جديد');
+}
+function npEdit() {
+  const ta = document.getElementById('npText');
+  if (ta) { ta.focus(); ta.select(); }
+}
+
+// ===== WINDOW MANAGEMENT =====
+function focusWindow(type) {
+  activeWindow = type;
+  zCounter++;
+  document.querySelectorAll('.window').forEach(w=>w.classList.remove('focused'));
+  const win = windows[type];
+  if(win) { win.el.style.zIndex=zCounter; win.el.classList.add('focused'); }
+  document.querySelectorAll('.tb-app').forEach(el=>{
+    el.classList.toggle('active', el.dataset.win===type);
+  });
+}
+function closeWindow(type) {
+  const win = windows[type]; if(!win) return;
+  win.el.remove();
+  delete windows[type];
+  removeTaskbarItem(type);
+  if(type==='taskman' && taskmanTimer) { clearInterval(taskmanTimer); taskmanTimer=null; }
+}
+function minimizeWindow(type) {
+  const win = windows[type]; if(!win) return;
+  win.el.style.display='none'; win.minimized=true;
+  const tb=document.querySelector(`.tb-app[data-win="${type}"]`);
+  if(tb) tb.classList.remove('active');
+}
+function restoreWindow(type) {
+  const win = windows[type]; if(!win) return;
+  win.el.style.display='flex'; win.minimized=false;
+  focusWindow(type);
+}
+function maximizeWindow(type) {
+  const win = windows[type]; if(!win) return;
+  if(win.maximized) {
+    win.el.classList.remove('win-maximized');
+    const r=win.rect;
+    win.el.style.cssText=`left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;z-index:${zCounter};display:flex;flex-direction:column`;
+    win.maximized=false;
+  } else {
+    win.el.classList.add('win-maximized');
+    win.el.style.zIndex=zCounter;
+    win.maximized=true;
+  }
+}
+function minimizeAll() {
+  Object.keys(windows).forEach(k=>{ if(!windows[k].minimized) minimizeWindow(k); });
+}
+function showDesktop() { minimizeAll(); }
+
+// ===== DRAG =====
+function setupDrag(type) {
+  const tb = document.getElementById('tb_'+type);
+  const win = windows[type].el;
+  if(!tb) return;
+  let dragging=false, ox=0, oy=0;
+  
+  function startDrag(e) {
+    if(e.target.closest('.win-controls')) return;
+    dragging=true;
+    const r=win.getBoundingClientRect();
+    const pt = e.touches?e.touches[0]:e;
+    ox=pt.clientX-r.left; oy=pt.clientY-r.top;
+    win.style.transition='none';
+    focusWindow(type);
+    e.preventDefault();
+  }
+  function doDrag(e) {
+    if(!dragging) return;
+    const pt=e.touches?e.touches[0]:e;
+    let x=pt.clientX-ox, y=pt.clientY-oy;
+    x=Math.max(0,Math.min(x,window.innerWidth-win.offsetWidth));
+    y=Math.max(0,Math.min(y,window.innerHeight-48-win.offsetHeight));
+    win.style.left=x+'px'; win.style.top=y+'px';
+    windows[type].rect.left=x; windows[type].rect.top=y;
+  }
+  function endDrag() { dragging=false; }
+  
+  tb.addEventListener('mousedown',startDrag);
+  tb.addEventListener('touchstart',startDrag,{passive:false});
+  document.addEventListener('mousemove',doDrag);
+  document.addEventListener('touchmove',doDrag,{passive:false});
+  document.addEventListener('mouseup',endDrag);
+  document.addEventListener('touchend',endDrag);
+}
+
+// ===== RESIZE =====
+function setupResize(type) {
+  const win = windows[type].el;
+  win.querySelectorAll('.resize-handle').forEach(handle=>{
+    let resizing=false, startX,startY,startW,startH,startL,startT;
+    const dir=handle.dataset.dir;
+    
+    handle.addEventListener('pointerdown',e=>{
+      resizing=true; handle.setPointerCapture(e.pointerId);
+      const r=win.getBoundingClientRect();
+      startX=e.clientX; startY=e.clientY;
+      startW=r.width; startH=r.height; startL=r.left; startT=r.top;
+      e.stopPropagation();
+    });
+    handle.addEventListener('pointermove',e=>{
+      if(!resizing) return;
+      const dx=e.clientX-startX, dy=e.clientY-startY;
+      let nw=startW,nh=startH,nl=startL,nt=startT;
+      if(dir.includes('e')) nw=Math.max(300,startW+dx);
+      if(dir.includes('s')) nh=Math.max(200,startH+dy);
+      if(dir.includes('w')) { nw=Math.max(300,startW-dx); nl=startL+startW-nw; }
+      if(dir.includes('n')) { nh=Math.max(200,startH-dy); nt=startT+startH-nh; }
+      win.style.width=nw+'px'; win.style.height=nh+'px';
+      win.style.left=nl+'px'; win.style.top=nt+'px';
+    });
+    handle.addEventListener('pointerup',()=>resizing=false);
+  });
+}
+
+// ===== TASKBAR ITEMS =====
+function addTaskbarItem(type, icon, title) {
+  const container = document.getElementById('taskbarApps');
+  if(taskbarItems[type]) return;
+  const el = document.createElement('div');
+  el.className='tb-app active'; el.dataset.win=type;
+  el.innerHTML=`<span class="tb-icon">${icon}</span><span style="max-width:80px;overflow:hidden;text-overflow:ellipsis">${title}</span>`;
+  el.onclick=()=>{
+    const win=windows[type];
+    if(!win) return;
+    if(win.minimized) restoreWindow(type);
+    else if(activeWindow===type) minimizeWindow(type);
+    else focusWindow(type);
+  };
+  container.appendChild(el);
+  taskbarItems[type]=el;
+  document.querySelectorAll('.tb-app').forEach(e=>e.classList.remove('active'));
+  el.classList.add('active');
+}
+function removeTaskbarItem(type) {
+  const el=taskbarItems[type]; if(el){ el.remove(); delete taskbarItems[type]; }
+}
+
+// ===== START MENU =====
+function toggleStart() {
+  const sm=document.getElementById('startMenu');
+  openStart=!openStart;
+  sm.classList.toggle('open',openStart);
+  if(openNotif) toggleNotif();
+}
+function closeStart() { document.getElementById('startMenu').classList.remove('open'); openStart=false; }
+function filterTiles(q) {
+  document.querySelectorAll('#smTiles .tile').forEach(t=>{
+    t.style.display=!q||t.querySelector('.tile-label').textContent.includes(q)?'flex':'none';
+  });
+}
+
+// ===== NOTIFICATIONS =====
+function toggleNotif() {
+  const na=document.getElementById('notifArea');
+  openNotif=!openNotif;
+  na.classList.toggle('open',openNotif);
+  if(openStart) closeStart();
+}
+function clearNotifs() { document.getElementById('notifList').innerHTML='<div style="padding:16px;font-size:13px;color:rgba(255,255,255,.5);text-align:center">لا توجد إشعارات</div>'; }
+
+// ===== CONTEXT MENU =====
+function showCtx(e,type) {
+  e.preventDefault(); e.stopPropagation();
+  const ctx=document.getElementById('contextMenu');
+  ctx.style.display='block';
+  ctx.style.left=Math.min(e.clientX,window.innerWidth-190)+'px';
+  ctx.style.top=Math.min(e.clientY,window.innerHeight-250)+'px';
+}
+function hideCtx() { document.getElementById('contextMenu').style.display='none'; }
+document.addEventListener('click',()=>{ hideCtx(); if(openStart&&event.target.closest('#startMenu')===null&&event.target.closest('#startBtn')===null) closeStart(); if(openNotif&&event.target.closest('#notifArea')===null&&event.target.closest('#taskbarRight')===null) toggleNotif(); });
+
+// ===== TOAST =====
+function showToast(title,body,dur=3000) {
+  const area=document.getElementById('toastArea');
+  const t=document.createElement('div'); t.className='toast';
+  t.innerHTML=`<div class="toast-title">${title}</div><div class="toast-body">${body}</div>`;
+  area.appendChild(t);
+  setTimeout(()=>{ t.style.opacity='0'; t.style.transition='opacity .4s'; setTimeout(()=>t.remove(),400); },dur);
+}
+
+// ===== POWER MENU =====
+function powerMenu() {
+  closeStart();
+  const choice=confirm('هل تريد إيقاف التشغيل؟\nاضغط موافق لإيقاف التشغيل\nاضغط إلغاء للإلغاء');
+  if(choice) {
+    document.body.innerHTML='<div style="background:#000;width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;color:white;font-size:16px;flex-direction:column;gap:12px"><div style="font-size:40px">⊞</div><div>جاري إيقاف التشغيل...</div></div>';
+    setTimeout(()=>location.reload(),3000);
+  }
+}
+
+// ===== TOUCHPAD (full-screen relative mode) =====
+let trackpadHandlersBound = false;
+function toggleTouchpad() {
+  touchpadActive = !touchpadActive;
+  const layer = document.getElementById('trackpadLayer');
+  const ptr = document.getElementById('mousePointer');
+  const badge = document.getElementById('trackpadBadge');
+  const btn = document.getElementById('touchpadBtn');
+  layer.classList.toggle('active', touchpadActive);
+  ptr.style.display = touchpadActive ? 'block' : 'none';
+  badge.classList.toggle('show', touchpadActive);
+  if (btn) btn.style.background = touchpadActive ? 'rgba(0,120,215,.5)' : '';
+  if (touchpadActive) {
+    mouseX = window.innerWidth / 2; mouseY = window.innerHeight / 2;
+    ptr.style.left = mouseX + 'px'; ptr.style.top = mouseY + 'px';
+    showToast('لوحة التتبع', 'اسحب في أي مكان على الشاشة لتحريك المؤشر، انقر للنقر');
+    setupTrackpadLayer(layer, ptr);
+  }
+}
+function setupTrackpadLayer(layer, ptr) {
+  if (trackpadHandlersBound) return;
+  trackpadHandlersBound = true;
+  let dragging = false, moved = false, lx = 0, ly = 0;
+  const speed = 1.5;
+  const pt = e => e.touches ? e.touches[0] : e;
+  function start(e) {
+    if (!touchpadActive) return;
+    e.preventDefault();
+    const p = pt(e); dragging = true; moved = false; lx = p.clientX; ly = p.clientY;
+  }
+  function move(e) {
+    if (!touchpadActive || !dragging) return;
+    e.preventDefault();
+    const p = pt(e);
+    const dx = (p.clientX - lx) * speed, dy = (p.clientY - ly) * speed;
+    if (Math.abs(p.clientX - lx) > 2 || Math.abs(p.clientY - ly) > 2) moved = true;
+    mouseX = Math.max(0, Math.min(mouseX + dx, window.innerWidth - 2));
+    mouseY = Math.max(0, Math.min(mouseY + dy, window.innerHeight - 2));
+    ptr.style.left = mouseX + 'px'; ptr.style.top = mouseY + 'px';
+    lx = p.clientX; ly = p.clientY;
+  }
+  function end(e) {
+    if (!touchpadActive || !dragging) return;
+    dragging = false;
+    if (!moved) {
+      layer.style.pointerEvents = 'none';
+      const el = document.elementFromPoint(mouseX, mouseY);
+      layer.style.pointerEvents = 'auto';
+      if (el) el.click();
+    }
+  }
+  layer.addEventListener('touchstart', start, { passive: false });
+  layer.addEventListener('touchmove', move, { passive: false });
+  layer.addEventListener('touchend', end, { passive: false });
+  layer.addEventListener('mousedown', start);
+  layer.addEventListener('mousemove', move);
+  layer.addEventListener('mouseup', end);
+}
+
+// ===== VKB =====
+function toggleVkb() { vkbVisible=!vkbVisible; document.getElementById('vkb').style.display=vkbVisible?'block':'none'; }
+function vkbHide() { vkbVisible=false; document.getElementById('vkb').style.display='none'; }
+function vkType(ch) {
+  const el=document.querySelector('textarea:focus, input:focus');
+  if(el) {
+    const s=el.selectionStart, e=el.selectionEnd;
+    el.value=el.value.substring(0,s)+ch+el.value.substring(e);
+    el.selectionStart=el.selectionEnd=s+ch.length;
+    el.dispatchEvent(new Event('input'));
+  }
+}
+function vkBackspace() {
+  const el=document.querySelector('textarea:focus, input:focus');
+  if(el && el.selectionStart>0) {
+    const s=el.selectionStart;
+    el.value=el.value.substring(0,s-1)+el.value.substring(s);
+    el.selectionStart=el.selectionEnd=s-1;
+  }
+}
+function vkEnter() { vkType('\n'); }
+
+// ===== AUTO-OPEN =====
+setTimeout(()=>{ showToast('Windows 10','جاهز للاستخدام! 🎉'); }, 3200);
+setTimeout(()=>{ showToast('Windows Defender','✅ جهازك محمي'); }, 5000);
+</script>
+</body>
+</html>
